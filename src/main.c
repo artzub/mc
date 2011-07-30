@@ -256,8 +256,12 @@ int
 do_cd (const char *new_dir, enum cd_enum exact)
 {
     gboolean res;
+    const char *_new_dir = new_dir;
 
-    res = do_panel_cd (current_panel, new_dir, exact);
+    if (current_panel->is_panelized && _new_dir[0] == '.' && _new_dir[1] == '.' && _new_dir[2] == 0)
+        _new_dir = ".";
+
+    res = do_panel_cd (current_panel, _new_dir, exact);
 
 #if HAVE_CHARSET
     if (res)

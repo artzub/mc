@@ -332,6 +332,15 @@ do_external_panelize (char *command)
     /* Clear the counters and the directory list */
     panel_clean_dir (current_panel);
 
+    list->list[0].fnamelen = 2;
+    list->list[0].fname = g_strdup ("..");
+    list->list[0].f.link_to_dir = 0;
+    list->list[0].f.stale_link = 0;
+    list->list[0].f.dir_size_computed = 0;
+    list->list[0].f.marked = 0;
+    list->list[0].st.st_mode = 040755;
+    next_free++;
+
     while (1)
     {
         clearerr (external);

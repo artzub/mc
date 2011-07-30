@@ -1889,8 +1889,24 @@ prev_page (WPanel * panel)
 static void
 goto_parent_dir (WPanel * panel)
 {
-    (void) panel;
-    do_cd ("..", cd_exact);
+    if (!panel->is_panelized)
+        do_cd ("..", cd_exact);
+    else
+    {
+        char *fname;
+        char *bname;
+        char *dname;
+
+        fname = mc_build_filename (panelize_root, panel->dir.list[panel->selected].fname, (char *) NULL);
+        bname = (char *) x_basename (fname);
+        dname = g_path_get_dirname (fname);
+
+        do_cd (dname, cd_exact);
+        try_to_select (panel, bname);
+
+        g_free (dname);
+        g_free (fname);
+    }
 }
 
 /* --------------------------------------------------------------------------------------------- */

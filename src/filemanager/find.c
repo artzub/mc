@@ -1607,6 +1607,15 @@ do_find (const char *start_dir, ssize_t start_dir_len, const char *ignore_dirs,
         dir_list *list = &current_panel->dir;
         char *name = NULL;
 
+        list->list[0].fnamelen = 2;
+        list->list[0].fname = g_strdup ("..");
+        list->list[0].f.link_to_dir = 0;
+        list->list[0].f.stale_link = 0;
+        list->list[0].f.dir_size_computed = 0;
+        list->list[0].f.marked = 0;
+        list->list[0].st.st_mode = 040755;
+        next_free++;
+
         for (i = 0, entry = find_list->list; entry != NULL; i++, entry = g_list_next (entry))
         {
             const char *lc_filename = NULL;
