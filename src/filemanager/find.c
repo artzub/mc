@@ -52,6 +52,7 @@
 #include "cmd.h"                /* view_file_at_line */
 #include "midnight.h"           /* current_panel */
 #include "boxes.h"
+#include "panelize.h"
 
 #include "find.h"
 
@@ -1691,6 +1692,7 @@ do_find (const char *start_dir, ssize_t start_dir_len, const char *ignore_dirs,
                 strcpy (current_panel->cwd, PATH_SEP_STR);
                 ret = chdir (PATH_SEP_STR);
             }
+            panelize_save_panel (current_panel);
         }
     }
 

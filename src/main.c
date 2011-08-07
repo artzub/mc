@@ -113,6 +113,10 @@ int macro_index = -1;
 
 GArray *macros_list;
 
+dir_list panelize_list = {NULL, 0};
+int panelize_count = -1;
+char *panelize_root = NULL;
+
 /*** file scope macro definitions ****************************************************************/
 
 /*** file scope type declarations ****************************************************************/
@@ -509,6 +513,11 @@ main (int argc, char *argv[])
 
     free_keymap_defs ();
 
+    if (panelize_count > 0)
+    {
+        clean_dir (&panelize_list, panelize_count);
+        g_free (panelize_root);
+    }
     /* Virtual File System shutdown */
     vfs_shut ();
 

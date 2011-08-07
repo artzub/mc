@@ -6,6 +6,7 @@
 #define MC__MAIN_H
 
 #include "lib/global.h"
+#include "filemanager/dir.h"
 
 /*** typedefs(not structures) and defined constants **********************************************/
 
@@ -81,6 +82,9 @@ extern const char *mc_prompt;
 extern int macro_index;
 
 extern GArray *macros_list;
+extern dir_list panelize_list;
+extern int panelize_count;
+extern char *panelize_root;
 
 /*** declarations of public functions ************************************************************/
 

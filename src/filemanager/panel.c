@@ -793,6 +793,7 @@ format_file (char *dest, int limit, WPanel * panel, int file_index, int width, i
                 tty_lowlevel_setcolor (-color);
 
             preperad_text = (char *) str_fit_to_term (txt, len, format->just_mode);
+
             if (perm)
                 add_permission_string (preperad_text, format->field_len, fe, attr, color, perm - 1);
             else
@@ -1091,7 +1092,10 @@ show_dir (WPanel * panel)
 
     widget_move (&panel->widget, 0, 3);
 
-    tty_printf (" %s ",
+    if (panel->is_panelized)
+        tty_printf (" %s: ", _("Panelize panel"));
+    else
+        tty_printf (" %s ",
                 str_term_trim (strip_home_and_password (panel->cwd),
                                min (max (panel->widget.cols - 12, 0), panel->widget.cols)));
 

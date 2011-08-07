@@ -209,6 +209,7 @@ create_panel_menu (void)
     entries = g_list_append (entries, menu_entry_create (_("SM&B link..."), CK_ConnectSmb));
 #endif
 #endif /* ENABLE_VFS_NET */
+    entries = g_list_append (entries, menu_entry_create (_("Panelize"), CK_Panelize));
     entries = g_list_append (entries, menu_separator_create ());
     entries = g_list_append (entries, menu_entry_create (_("&Rescan"), CK_Reread));
 
@@ -1248,6 +1249,9 @@ midnight_execute_cmd (Widget * sender, unsigned long command)
         smblink_cmd ();
         break;
 #endif /* ENABLE_VFS_SMB */
+    case CK_Panelize:
+        cd_panelize_cmd ();
+        break;
     case CK_Help:
         help_cmd ();
         break;

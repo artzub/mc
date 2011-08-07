@@ -401,7 +401,91 @@ do_external_panelize (char *command)
 }
 
 /* --------------------------------------------------------------------------------------------- */
+
+static void
+do_panelize_cd (struct WPanel *panel)
+{
+    int i;
+    dir_list *list = &panel->dir;
+    clean_dir (list, panel->count);
+    if (panelize_root != NULL)
+        do_cd (panelize_root, cd_exact);
+    if (panelize_count < 1)
+    {
+        panelize_list.list = g_try_realloc (panelize_list.list, sizeof (file_entry));
+        panelize_list.list[0].fnamelen = 2;
+        panelize_list.list[0].fname = g_strdup ("..");
+        panelize_list.list[0].f.link_to_dir = 0;
+        panelize_list.list[0].f.stale_link = 0;
+        panelize_list.list[0].f.dir_size_computed = 0;
+        panelize_list.list[0].f.marked = 0;
+        panelize_list.list[0].st.st_mode = 040755;
+        panelize_count = 1;
+    }
+    else if (panelize_count >= list->size)
+        list->list = g_try_realloc (list->list, sizeof (file_entry) * (panelize_count));
+
+    panel->count = panelize_count;
+    panel->is_panelized = 1;
+
+    for (i = 0; i < panelize_count; i++)
+    {
+        list->list[i].fnamelen = panelize_list.list[i].fnamelen;
+        list->list[i].fname = g_strdup (panelize_list.list[i].fname);
+        list->list[i].f.link_to_dir = panelize_list.list[i].f.link_to_dir;
+        list->list[i].f.stale_link = panelize_list.list[i].f.stale_link;
+        list->list[i].f.dir_size_computed = panelize_list.list[i].f.dir_size_computed;
+        list->list[i].f.marked = panelize_list.list[i].f.marked;
+        list->list[i].st = panelize_list.list[i].st;
+    }
+}
+
+/* --------------------------------------------------------------------------------------------- */
 /*** public functions ****************************************************************************/
+/* --------------------------------------------------------------------------------------------- */
+
+void
+panelize_save_panel (struct WPanel *panel)
+{
+    int i;
+    dir_list *list = &panel->dir;
+
+    g_free (panelize_root);
+    panelize_root = g_strdup (panel->cwd);
+
+    if (panelize_count > 0)
+        clean_dir (&panelize_list, panelize_count);
+    if (panel->count < 1)
+        return;
+
+    panelize_count = panel->count;
+    if (panel->count >= panelize_list.size)
+        panelize_list.list = g_try_realloc (panelize_list.list, sizeof (file_entry) * (panel->count));
+
+    for (i = 0; i < panel->count; i++)
+    {
+        panelize_list.list[i].fnamelen = list->list[i].fnamelen;
+        panelize_list.list[i].fname = g_strdup (list->list[i].fname);
+        panelize_list.list[i].f.link_to_dir = list->list[i].f.link_to_dir;
+        panelize_list.list[i].f.stale_link = list->list[i].f.stale_link;
+        panelize_list.list[i].f.dir_size_computed = list->list[i].f.dir_size_computed;
+        panelize_list.list[i].f.marked = list->list[i].f.marked;
+        panelize_list.list[i].st = list->list[i].st;
+    }
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+void
+cd_panelize_cmd (void)
+{
+    WPanel *panel = NULL;
+
+    panel = MENU_PANEL_IDX == 0 ? left_panel : right_panel;
+
+    do_panelize_cd (panel);
+}
+
 /* --------------------------------------------------------------------------------------------- */
 
 void
