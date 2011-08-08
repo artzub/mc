@@ -332,14 +332,8 @@ do_external_panelize (char *command)
     /* Clear the counters and the directory list */
     panel_clean_dir (current_panel);
 
-    list->list[0].fnamelen = 2;
-    list->list[0].fname = g_strdup ("..");
-    list->list[0].f.link_to_dir = 0;
-    list->list[0].f.stale_link = 0;
-    list->list[0].f.dir_size_computed = 0;
-    list->list[0].f.marked = 0;
-    list->list[0].st.st_mode = 040755;
-    next_free++;
+    if (set_zero_dir (list))
+        next_free++;
 
     while (1)
     {
@@ -412,15 +406,8 @@ do_panelize_cd (struct WPanel *panel)
         do_cd (panelize_root, cd_exact);
     if (panelize_count < 1)
     {
-        panelize_list.list = g_try_realloc (panelize_list.list, sizeof (file_entry));
-        panelize_list.list[0].fnamelen = 2;
-        panelize_list.list[0].fname = g_strdup ("..");
-        panelize_list.list[0].f.link_to_dir = 0;
-        panelize_list.list[0].f.stale_link = 0;
-        panelize_list.list[0].f.dir_size_computed = 0;
-        panelize_list.list[0].f.marked = 0;
-        panelize_list.list[0].st.st_mode = 040755;
-        panelize_count = 1;
+        if (set_zero_dir (&panelize_list))
+            panelize_count = 1;
     }
     else if (panelize_count >= list->size)
         list->list = g_try_realloc (list->list, sizeof (file_entry) * (panelize_count));
