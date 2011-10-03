@@ -1261,8 +1261,8 @@ sftpfs_open_archive (struct vfs_s_super *super,
     g_free (vpath_element->host);
     ((vfs_path_element_t *) vpath_element)->host = g_strdup (sftpfs_host);
 
-    g_free (vpath_element->sftpfs_user);
-    ((vfs_path_element_t *) vpath_element)->host = g_strdup (sftpfs_user);
+    g_free (vpath_element->user);
+    ((vfs_path_element_t *) vpath_element)->user = g_strdup (sftpfs_user);
 
     ((vfs_path_element_t *) vpath_element)->port = sftpfs_port;
 
