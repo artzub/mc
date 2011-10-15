@@ -203,7 +203,6 @@ void menu_save_mode_cmd (void);
 int edit_translate_key (WEdit * edit, long x_key, int *cmd, int *ch);
 int edit_get_byte (WEdit * edit, long byte_index);
 char *edit_get_byte_ptr (WEdit * edit, long byte_index);
-char *edit_get_buf_ptr (WEdit * edit, long byte_index);
 int edit_get_utf (WEdit * edit, long byte_index, int *char_width);
 int edit_get_prev_utf (WEdit * edit, long byte_index, int *char_width);
 long edit_count_lines (WEdit * edit, long current, long upto);
