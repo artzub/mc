@@ -1765,6 +1765,7 @@ edit_get_utf (WEdit * edit, long byte_index, int *char_width)
     gunichar ch;
     gchar *next_ch = NULL;
     int width = 0;
+    gchar utf8_buf[6 + 1];
 
     if (byte_index >= (edit->curs1 + edit->curs2) || byte_index < 0)
     {
@@ -1781,6 +1782,17 @@ edit_get_utf (WEdit * edit, long byte_index, int *char_width)
     }
 
     res = g_utf8_get_char_validated (str, -1);
+
+    if (res < 0)
+    {
+        /* Retry with explicit bytes to make sure it's not a buffer boundary */
+        int i;
+        for (i = 0; i < 6; i++)
+            utf8_buf[i] = edit_get_byte (edit, byte_index + i);
+        utf8_buf[6] = '\0';
+        str = utf8_buf;
+        res = g_utf8_get_char_validated (str, -1);
+    }
 
     if (res < 0)
     {
