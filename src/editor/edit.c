@@ -1799,7 +1799,7 @@ int
 edit_get_prev_utf (WEdit * edit, long byte_index, int *char_width)
 {
     int i, res;
-    gchar utf8_buf[3 * 6 + 1];
+    gchar utf8_buf[3 * UTF8_CHAR_LEN + 1];
     gchar *str;
     gchar *valid_char;
 
@@ -1809,17 +1809,17 @@ edit_get_prev_utf (WEdit * edit, long byte_index, int *char_width)
         return 0;
     }
 
-    for (i = 0; i < 18; i++)
-        utf8_buf[i] = edit_get_byte (edit, byte_index + i - 12);
-    utf8_buf[18] = '\0';
+    for (i = 0; i < (3 * UTF8_CHAR_LEN); i++)
+        utf8_buf[i] = edit_get_byte (edit, byte_index + i - (2 * UTF8_CHAR_LEN));
+    utf8_buf[3 * UTF8_CHAR_LEN] = '\0';
 
-    valid_char = utf8_buf + 12;
+    valid_char = utf8_buf + (2 * UTF8_CHAR_LEN);
     str = g_utf8_find_prev_char (utf8_buf, valid_char);
 
     if (str == NULL || g_utf8_next_char(str) != valid_char)
     {
         *char_width = 1;
-        return utf8_buf[11];
+        return utf8_buf[2 * UTF8_CHAR_LEN - 1];
     }
     else
     {
@@ -1828,7 +1828,7 @@ edit_get_prev_utf (WEdit * edit, long byte_index, int *char_width)
         if (res < 0)
         {
             *char_width = 1;
-            return utf8_buf[11];
+            return utf8_buf[2 * UTF8_CHAR_LEN - 1];
         }
         else
         {
