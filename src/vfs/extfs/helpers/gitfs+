@@ -1,4 +1,4 @@
-﻿#!/bin/sh
+#!/bin/sh
 
 LANG=C
 export LANG
@@ -15,10 +15,16 @@ gitfs_list()
 	status=" "
 	case "$trepo" in
 		'true')
-			# TODO решить проблему дублирования каталогов и каталого которые отбражаются как файлы
-			git ls-tree -r -t --name-only HEAD | sed -e 's/"//g' -e 's/\\/\\\\\\\\/g' | sort -k 1 | while read fname
+			git ls-tree --name-only HEAD | 
+				sed -e 's/"//g' -e 's/\\/\\\\\\\\/g' |
+			while read fname
 			do
-				echo "-r--r--r--   1 $user     0  0 $DATE `dirname $fname`/$prefix$status`basename $fname`"
+				git ls-tree --name-only -r HEAD $fname | 
+					sed -e 's/"//g' -e 's/\\/\\\\\\\\/g' |
+				while read fname
+				do
+					echo "-r--r--r--   1 $user     0  0 $DATE `dirname \"$fname\"`/$prefix$status`basename \"$fname\"`"
+				done
 			done
 		;;
 		*)
@@ -26,7 +32,7 @@ gitfs_list()
 			do
 				[ "$status" = "H" ] && status=" "
 				[ "$status" = "C" ] && status="*"
-				echo "-r--r--r--   1 $user     0  0 $DATE `dirname $fname`/$prefix$status`basename $fname`"
+				echo "-r--r--r--   1 $user     0  0 $DATE `dirname \"$fname\"`/$prefix$status`basename \"$fname\"`"
 			done
 		;;
 	esac
@@ -38,7 +44,7 @@ gitfs_copyout()
     b=`echo "$prefix"| wc -c`
     b=`expr "$b" + 1`
     # remove prefix from file name
-    echo "`dirname "$3"`/`basename "$3" | tail -c+"$b"`" >> "$4"
+    echo "`dirname \"$3\"`/`basename \"$3\" | tail -c+\"$b\"`" >> "$4"
     echo "git" >> "$4"
 }
 
