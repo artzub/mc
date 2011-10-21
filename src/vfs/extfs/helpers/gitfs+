@@ -1,4 +1,4 @@
-#!/bin/sh
+﻿#!/bin/sh
 
 LANG=C
 export LANG
@@ -11,17 +11,30 @@ gitfs_list()
     DATE=`date +"%b %d %H:%M"`
     GIT_DIR="$2/.git"
     user=`whoami`
-    git ls-files -v -c -m -d | sort -k 2 | uniq -f 1 | while read status fname
-    do
-        [ "$status" = "H" ] && status=" "
-        [ "$status" = "C" ] && status="*"
-        echo "-r--r--r--   1 $user     0  0 $DATE `dirname $fname`/$prefix$status`basename $fname`"
-    done
+	trepo=`git var -l | grep -e '^core.bare=true' | cut -d '=' -f2`
+	status=" "
+	case "$trepo" in
+		'true')
+			# TODO решить проблему дублирования каталогов и каталого которые отбражаются как файлы
+			git ls-tree -r -t --name-only HEAD | sed -e 's/"//g' -e 's/\\/\\\\\\\\/g' | sort -k 1 | while read fname
+			do
+				echo "-r--r--r--   1 $user     0  0 $DATE `dirname $fname`/$prefix$status`basename $fname`"
+			done
+		;;
+		*)
+			git ls-files -v -c -m -d | sed -e 's/"//g' -e 's/\\/\\\\\\\\/g' | sort -k 2 | uniq -f 1 | while read status fname
+			do
+				[ "$status" = "H" ] && status=" "
+				[ "$status" = "C" ] && status="*"
+				echo "-r--r--r--   1 $user     0  0 $DATE `dirname $fname`/$prefix$status`basename $fname`"
+			done
+		;;
+	esac
 }
 
 gitfs_copyout()
 {
-    echo -e "$2" > "$4"
+    echo "$2" > "$4"
     b=`echo "$prefix"| wc -c`
     b=`expr "$b" + 1`
     # remove prefix from file name
