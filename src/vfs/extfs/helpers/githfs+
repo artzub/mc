@@ -1,0 +1,58 @@
+#!/bin/sh
+
+LANG=C
+export LANG
+
+umask 077
+prefix='[c:'
+
+gitfs_list()
+{
+    DATE=`date +"%b %d %H:%M"`
+    GIT_DIR="$2/.git"
+    user=`whoami`	
+	curr_year=`date +"%Y"`
+	echo "" > /home/artzub/1
+	lastTime=0
+	git log --abbrev=7 --pretty="format:^%at %h %s" | 
+		#--graph --no-color | 
+		# sed -e 's%|\\%├─┐%g' \
+			# -e 's%|/%├─┘%g' \
+			# -e 's%\s\\% │%' \
+			# -e 's%/%┘%g' \
+			# -e 's%|\s\s\s%└─┐ %g' \
+			# -e 's/|/│/g' \
+			# -e 's/*/├/' | 
+	while read tt	
+	do
+		str=`echo "$tt" | cut -d '^' -f2`		
+		[ "$tt" = "$str" ] && str=$lastTime" 0000000 " || str=$str".diff"
+		tt=`echo "$tt" | cut -d '^' -f1`
+		
+		echo "$str" | sed -e 's%/%\\\\%g' | while read TIMESTAMP status fname
+		do
+			lastTime=$TIMESTAMP
+			
+			year=`date -d @"$TIMESTAMP" +"%Y"`
+			[ "$year" = "$curr_year" ] && {
+				DATE=`date -d @"$TIMESTAMP" +"%b %d %H:%M"`
+			} || {
+				DATE=`date -d @"$TIMESTAMP" +"%b %d %Y"`
+			}				
+			echo "-r--r--r--   1 $user     0  0 $DATE $prefix$status]$tt$fname"
+		done
+	done
+}
+
+gitfs_copyout()
+{
+    b=`echo \"$3\" | cut -d ':' -f2 | cut -d ']' -f1`
+	[ "$b" = "0000000" ] && echo "fork" >> "$4" || git log -1 -p --stat $b >> "$4"	
+}
+
+case "$1" in
+    list) gitfs_list "$@" ;;
+    copyout) gitfs_copyout "$@" ;;
+    *) exit 1 ;;
+esac
+exit 0
