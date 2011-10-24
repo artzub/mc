@@ -4,44 +4,39 @@ LANG=C
 export LANG
 
 umask 077
-prefix='[c:'
 
 gitfs_list()
 {
-    DATE=`date +"%b %d %H:%M"`
-    GIT_DIR="$2/.git"
-    user=`whoami`	
+	user=`whoami`
 	curr_year=`date +"%Y"`
-	echo "" > /home/artzub/1
-	lastTime=0
-	git log --abbrev=7 --pretty="format:^%at %h %s" | 
-		#--graph --no-color | 
-		# sed -e 's%|\\%├─┐%g' \
-			# -e 's%|/%├─┘%g' \
-			# -e 's%\s\\% │%' \
-			# -e 's%/%┘%g' \
-			# -e 's%|\s\s\s%└─┐ %g' \
-			# -e 's/|/│/g' \
-			# -e 's/*/├/' | 
-	while read tt	
-	do
-		str=`echo "$tt" | cut -d '^' -f2`		
-		[ "$tt" = "$str" ] && str=$lastTime" 0000000 " || str=$str".diff"
-		tt=`echo "$tt" | cut -d '^' -f1`
-		
-		echo "$str" | sed -e 's%/%\\\\%g' | while read TIMESTAMP status fname
-		do
-			lastTime=$TIMESTAMP
-			
-			year=`date -d @"$TIMESTAMP" +"%Y"`
-			[ "$year" = "$curr_year" ] && {
-				DATE=`date -d @"$TIMESTAMP" +"%b %d %H:%M"`
-			} || {
-				DATE=`date -d @"$TIMESTAMP" +"%b %d %Y"`
-			}				
-			echo "-r--r--r--   1 $user     0  0 $DATE $prefix$status]$tt$fname"
-		done
-	done
+
+	git log --abbrev=7 --pretty="format:^%at %h %s" --graph | sed -e 's/\\/\\/g' |
+	awk -F^ -v cy=$curr_year -v ur=$user '{
+		px=$1;
+		gsub(/\/|\\/, "+", px);
+		str="";
+		hash="0000000";
+		if( length($2) > 0 ) {
+			split($2" ", a, " ");
+			lastTime=a[1];
+			hash=a[2];
+			str=substr($2, index($2, hash) + length(hash), length($2));
+			str=str".diff";
+			delete a;
+		}
+
+		cmd="date -d @\""lastTime"\" +\"%Y\"";
+		cmd | getline year;
+		close(cmd);
+
+		cmd="date -d @\""lastTime"\" +\"%b %d %Y\"";
+		if (cy == year)
+			cmd="date -d @\""lastTime"\" +\"%b %d %H:%M\"";
+		cmd | getline date;
+		close(cmd);
+
+		print "-r--r--r--   1 "ur"     0  0 "date" [c:"hash"]"px""str;
+	}'
 }
 
 gitfs_copyout()
