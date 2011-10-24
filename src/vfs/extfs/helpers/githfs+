@@ -7,6 +7,7 @@ umask 077
 
 gitfs_list()
 {
+	GIT_DIR="$2/.git"
 	user=`whoami`
 	curr_year=`date +"%Y"`
 
@@ -14,6 +15,7 @@ gitfs_list()
 	awk -F^ -v cy=$curr_year -v ur=$user '{
 		px=$1;
 		gsub(/\/|\\/, "+", px);
+		gsub(/\//, "\\", $2);
 		str="";
 		hash="0000000";
 		if( length($2) > 0 ) {
