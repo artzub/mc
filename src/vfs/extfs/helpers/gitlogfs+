@@ -1,0 +1,91 @@
+#!/bin/sh
+
+LANG=C
+export LANG
+
+umask 077
+
+gitfs_list()
+{
+	bare=`git rev-parse --is-bare-repository`
+	[ "$bare" = "true" ] && GIT_DIR="$2/." || GIT_DIR="$2/.git"
+	GIT_DIR=`git rev-parse --git-dir`
+	case $GIT_DIR in
+		"."|".git") GIT_DIR="$2/"$GIT_DIR ;;
+	esac
+
+	user=`whoami`
+	curr_year=`date +"%Y"`
+
+	[ "$bare" = "false" ] && {
+		DATE=`date +"%b %d %H:%M"`
+
+		notindex=`git diff-files --numstat | grep -e '^[1-9]\+' -e '^0\s+[1-9]\+' | sed -n '$='`
+		[ -n "$notindex" ] && {
+			echo "-r--r--r--   1 $user     0  0 $DATE [**index]* Changes in the work tree that are not registered in the index.diff"
+		}
+
+		cached=`git diff-index --cached HEAD -z | sed -n '$='`
+		[ -n "$cached" ] && {
+			echo "-r--r--r--   1 $user     0  0 $DATE [*cached]* The changes recorded in the index, but not saved.diff"
+		}
+	}
+
+	git log -100 --pretty="format:^%at %h %s" --graph |
+	awk -F^ -v cy=$curr_year -v ur=$user '{
+		px=$1;
+		gsub(/\/|\\/, "+", px);
+		gsub(/\//, "\\", $2);
+		str="";
+		hash="0000000";
+		if( length($2) > 0 ) {
+			split($2" ", a, " ");
+			lastTime=a[1];
+			hash=a[2];
+			str=substr($2, index($2, hash) + length(hash), 80);
+			str=str".diff";
+			delete a;
+		}
+
+		cmd="date -d @\""lastTime"\" +\"%Y\"";
+		cmd | getline year;
+		close(cmd);
+
+		cmd="date -d @\""lastTime"\" +\"%b %d %Y\"";
+		if (cy == year)
+			cmd="date -d @\""lastTime"\" +\"%b %d %H:%M\"";
+		cmd | getline date;
+		close(cmd);
+
+		print "-r--r--r--   1 "ur"     0  0 "date" ["hash"]"px""str;
+	}'
+}
+
+gitfs_copyout()
+{
+    b=`echo \"$3\" | cut -d '[' -f2 | cut -d ']' -f1`
+	case "$b" in
+		"0000000") echo "fork" > "$4";;
+		"**index")
+			echo "Changes in the work tree that are not registered in the index" > "$4"
+			echo >> "$4"
+			files=`git diff-files --numstat | awk '/^[1-9]+|^0\t+[1-9]+/ {sub(/^[0-9]+\t+[0-9]+\t+/,"", $0); px=$0" "px; } END { print px }'`
+			git diff-files --patch-with-stat -- $files >> "$4"
+		;;
+		"*cached")
+			echo "The changes recorded in the index, but not saved" > "$4"
+			echo >> "$4"
+			git diff-index --cached --patch-with-stat HEAD >> "$4"
+		;;
+		*)
+			git log -1 -p --stat $b > "$4"
+		;;
+	esac
+}
+
+case "$1" in
+    list) gitfs_list "$@" ;;
+    copyout) gitfs_copyout "$@" ;;
+    *) exit 1 ;;
+esac
+exit 0

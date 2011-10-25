@@ -8,13 +8,13 @@ prefix='[git]'
 
 gitfs_list()
 {
-    DATE=`date +"%b %d %H:%M"`
-    GIT_DIR="$2/.git"
+    DATE=`date +"%b %d %H:%M"`    
     user=`whoami`
-	trepo=`git var -l | grep -e '^core.bare=true' | cut -d '=' -f2`
+	bare=`git  rev-parse --is-bare-repository`
 	status=" "
-	case "$trepo" in
+	case "$bare" in
 		'true')
+			GIT_DIR="$2"
 			git ls-tree --name-only HEAD | 
 				sed -e 's/"//g' -e 's/\\/\\\\\\\\/g' |
 			while read fname
@@ -28,6 +28,7 @@ gitfs_list()
 			done
 		;;
 		*)
+			GIT_DIR="$2/.git"
 			git ls-files -v -c -m -d | sed -e 's/"//g' -e 's/\\/\\\\\\\\/g' | sort -k 2 | uniq -f 1 | while read status fname
 			do
 				[ "$status" = "H" ] && status=" "
