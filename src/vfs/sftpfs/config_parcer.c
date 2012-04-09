@@ -1,5 +1,5 @@
 /* Virtual File System: SFTP file system.
-   The internal functions
+   The SSH config parser
 
    Copyright (C) 2011
    The Free Software Foundation, Inc.
@@ -25,15 +25,12 @@
  */
 
 #include <config.h>
-#include <errno.h>
 
 #include "lib/global.h"
 
 #include "internal.h"
 
 /*** global variables ****************************************************************************/
-
-GString *sftpfs_filename_buffer = NULL;
 
 /*** file scope macro definitions ****************************************************************/
 
@@ -46,4 +43,12 @@ GString *sftpfs_filename_buffer = NULL;
 
 /* --------------------------------------------------------------------------------------------- */
 /*** public functions ****************************************************************************/
+/* --------------------------------------------------------------------------------------------- */
+
+void
+sftpfs_fill_connection_data_from_config (struct vfs_s_super *super)
+{
+    (void) super;
+}
+
 /* --------------------------------------------------------------------------------------------- */

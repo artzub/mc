@@ -25,6 +25,7 @@
  */
 
 #include <config.h>
+#include <errno.h>
 
 #include "lib/global.h"
 #include "lib/vfs/utilvfs.h"
@@ -90,7 +91,7 @@ static int
 sftpfs_cb_open_connection (struct vfs_s_super *super,
                      const vfs_path_t * vpath, const vfs_path_element_t * vpath_element)
 {
-    char *user_name;
+    char *user_name = NULL;
 
     (void) vpath;
 
@@ -101,7 +102,7 @@ sftpfs_cb_open_connection (struct vfs_s_super *super,
         return 0;
     }
 
-    if (vpath_element->user != NULL)
+    if (vpath_element->user == NULL)
     {
         user_name = vfs_get_local_username ();
         if (user_name == NULL)
@@ -116,7 +117,7 @@ sftpfs_cb_open_connection (struct vfs_s_super *super,
     if (super->path_element->user == NULL)
         super->path_element->user = user_name;
 
-    sftpfs_fill_connection_data (super);
+    sftpfs_fill_connection_data_from_config (super);
 
     return sftpfs_open_connection (super);
 }

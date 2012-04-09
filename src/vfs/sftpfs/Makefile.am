@@ -4,6 +4,9 @@ AM_CPPFLAGS =
 noinst_LTLIBRARIES = libvfs-sftpfs.la
 
 libvfs_sftpfs_la_SOURCES = \
+	config_parcer.c \
+	connection.c \
+	file.c \
 	interface.c \
 	init.h \
 	internal.c internal.h \
