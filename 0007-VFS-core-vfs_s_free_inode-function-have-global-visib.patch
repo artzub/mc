@@ -1,0 +1,105 @@
+From e621717c9327c63088b2af95a576b91ca7368560 Mon Sep 17 00:00:00 2001
+From: Slava Zanko <slavazanko@gmail.com>
+Date: Wed, 20 Jul 2011 00:36:05 +0300
+Subject: [PATCH 07/10] VFS core: vfs_s_free_inode() function have global
+ visibility
+
+Signed-off-by: Slava Zanko <slavazanko@gmail.com>
+---
+ lib/vfs/direntry.c  |   59 ++++++++++++++++++++++++++-------------------------
+ lib/vfs/xdirentry.h |    2 +
+ 2 files changed, 32 insertions(+), 29 deletions(-)
+
+diff --git a/lib/vfs/direntry.c b/lib/vfs/direntry.c
+index 96d70bf..de6c798 100644
+--- a/lib/vfs/direntry.c
++++ b/lib/vfs/direntry.c
+@@ -109,35 +109,6 @@ vfs_s_entry_compare (const void *a, const void *b)
+ 
+ /* --------------------------------------------------------------------------------------------- */
+ 
+-static void
+-vfs_s_free_inode (struct vfs_class *me, struct vfs_s_inode *ino)
+-{
+-    if (ino == NULL)
+-        vfs_die ("Don't pass NULL to me");
+-
+-    /* ==0 can happen if freshly created entry is deleted */
+-    if (ino->st.st_nlink > 1)
+-    {
+-        ino->st.st_nlink--;
+-        return;
+-    }
+-
+-    while (ino->subdir != NULL)
+-        vfs_s_free_entry (me, (struct vfs_s_entry *) ino->subdir->data);
+-
+-    CALL (free_inode) (me, ino);
+-    g_free (ino->linkname);
+-    if ((MEDATA->flags & VFS_S_USETMP) != 0 && ino->localname != NULL)
+-    {
+-        unlink (ino->localname);
+-        g_free (ino->localname);
+-    }
+-    total_inodes--;
+-    ino->super->ino_usage--;
+-    g_free (ino);
+-}
+-
+-/* --------------------------------------------------------------------------------------------- */
+ /* We were asked to create entries automagically */
+ 
+ static struct vfs_s_entry *
+@@ -952,6 +923,36 @@ vfs_s_new_inode (struct vfs_class *me, struct vfs_s_super *super, struct stat *i
+ 
+ /* --------------------------------------------------------------------------------------------- */
+ 
++void
++vfs_s_free_inode (struct vfs_class *me, struct vfs_s_inode *ino)
++{
++    if (ino == NULL)
++        vfs_die ("Don't pass NULL to me");
++
++    /* ==0 can happen if freshly created entry is deleted */
++    if (ino->st.st_nlink > 1)
++    {
++        ino->st.st_nlink--;
++        return;
++    }
++
++    while (ino->subdir != NULL)
++        vfs_s_free_entry (me, (struct vfs_s_entry *) ino->subdir->data);
++
++    CALL (free_inode) (me, ino);
++    g_free (ino->linkname);
++    if ((MEDATA->flags & VFS_S_USETMP) != 0 && ino->localname != NULL)
++    {
++        unlink (ino->localname);
++        g_free (ino->localname);
++    }
++    total_inodes--;
++    ino->super->ino_usage--;
++    g_free (ino);
++}
++
++/* --------------------------------------------------------------------------------------------- */
++
+ struct vfs_s_entry *
+ vfs_s_new_entry (struct vfs_class *me, const char *name, struct vfs_s_inode *inode)
+ {
+diff --git a/lib/vfs/xdirentry.h b/lib/vfs/xdirentry.h
+index acc8b6d..2e63a7b 100644
+--- a/lib/vfs/xdirentry.h
++++ b/lib/vfs/xdirentry.h
+@@ -158,6 +158,8 @@ struct vfs_s_subclass
+ /* entries and inodes */
+ struct vfs_s_inode *vfs_s_new_inode (struct vfs_class *me,
+                                      struct vfs_s_super *super, struct stat *initstat);
++void vfs_s_free_inode (struct vfs_class *me, struct vfs_s_inode *ino);
++
+ struct vfs_s_entry *vfs_s_new_entry (struct vfs_class *me, const char *name,
+                                      struct vfs_s_inode *inode);
+ void vfs_s_free_entry (struct vfs_class *me, struct vfs_s_entry *ent);
+-- 
+1.7.7.6
+

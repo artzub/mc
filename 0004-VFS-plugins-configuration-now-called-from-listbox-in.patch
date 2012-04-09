@@ -1,0 +1,133 @@
+From d57dbadfb4eac21a97849fda16723d18d0d4cc80 Mon Sep 17 00:00:00 2001
+From: Slava Zanko <slavazanko@gmail.com>
+Date: Wed, 1 Jun 2011 12:04:25 +0300
+Subject: [PATCH 04/10] VFS plugins configuration now called from listbox
+ instead of menu.
+
+Menu contain just call to this listbox.
+
+Signed-off-by: Slava Zanko <slavazanko@gmail.com>
+---
+ lib/keybind.c              |    1 +
+ lib/keybind.h              |    1 +
+ src/filemanager/boxes.c    |   45 ++++++++++++++++++++++++++++++++++++++++++++
+ src/filemanager/boxes.h    |    1 +
+ src/filemanager/midnight.c |    3 ++
+ 5 files changed, 51 insertions(+), 0 deletions(-)
+
+diff --git a/lib/keybind.c b/lib/keybind.c
+index eda57b1..c79a064 100644
+--- a/lib/keybind.c
++++ b/lib/keybind.c
+@@ -150,6 +150,7 @@ static name_keymap_t command_names[] = {
+     {"CompareFiles", CK_CompareFiles},
+ #endif
+     {"OptionsVfs", CK_OptionsVfs},
++    {"OptionsVfsPlugin", CK_OptionsVfsPlugin},
+     {"OptionsConfirm", CK_OptionsConfirm},
+     {"OptionsDisplayBits", CK_OptionsDisplayBits},
+     {"EditExtensionsFile", CK_EditExtensionsFile},
+diff --git a/lib/keybind.h b/lib/keybind.h
+index ef38a96..a79dac1 100644
+--- a/lib/keybind.h
++++ b/lib/keybind.h
+@@ -135,6 +135,7 @@ enum
+     CK_PanelListingChange,
+     CK_CompareDirs,
+     CK_OptionsVfs,
++    CK_OptionsVfsPlugin,
+     CK_OptionsConfirm,
+     CK_PutCurrentLink,
+     CK_PutOtherLink,
+diff --git a/src/filemanager/boxes.c b/src/filemanager/boxes.c
+index 64a4b2f..695d39f 100644
+--- a/src/filemanager/boxes.c
++++ b/src/filemanager/boxes.c
+@@ -57,6 +57,7 @@
+ 
+ #include "lib/util.h"           /* Q_() */
+ #include "lib/widget.h"
++#include "lib/event.h"
+ 
+ #include "src/setup.h"          /* For profile_name */
+ #include "src/background.h"     /* task_list */
+@@ -1001,6 +1002,50 @@ configure_vfs (void)
+ #undef VFSY
+ }
+ 
++/* --------------------------------------------------------------------------------------------- */
++
++void
++configure_vfs_plugin (void)
++{
++    /* get list of vfs-plugins, who need call to configuration dialog */
++    GList *config_plugins = NULL, *iterator;
++    int listbox_lines = 0, listbox_cols = 0, listbox_result;
++    Listbox *listbox;
++
++    mc_event_raise ("vfs", "plugin_name_for_config_dialog", (gpointer) & config_plugins);
++    if (config_plugins == NULL)
++        return;
++
++    /* calculate columns and lines in future listbox object */
++    for (iterator = config_plugins; iterator != NULL;
++         iterator = g_list_next (iterator), listbox_lines++)
++    {
++        listbox_cols = max (listbox_cols, (int) strlen ((const char *) iterator->data));
++    }
++    listbox_cols = min (listbox_cols, COLS);
++    listbox_lines = min (listbox_lines, LINES);
++
++
++    listbox = create_listbox_window (listbox_lines, listbox_cols, _("Choose VFS plugin"),
++                                     "[VFS plugins settings]");
++
++    for (iterator = config_plugins; iterator != NULL; iterator = g_list_next (iterator))
++    {
++        LISTBOX_APPEND_TEXT (listbox, '\0', (const char *) iterator->data, NULL);
++    }
++
++    listbox_result = run_listbox (listbox);
++
++    if (listbox_result >= 0)
++    {
++        iterator = g_list_nth (config_plugins, listbox_result);
++        if (iterator != NULL)
++            mc_event_raise ("vfs", "plugin_show_config_dialog", iterator->data);
++    }
++
++    g_list_free (config_plugins);
++}
++
+ #endif /* ENABLE_VFS */
+ 
+ /* --------------------------------------------------------------------------------------------- */
+diff --git a/src/filemanager/boxes.h b/src/filemanager/boxes.h
+index 2b06cb7..b9251ec 100644
+--- a/src/filemanager/boxes.h
++++ b/src/filemanager/boxes.h
+@@ -23,6 +23,7 @@ const panel_field_t *sort_box (panel_sort_info_t *info);
+ void confirm_box (void);
+ void display_bits_box (void);
+ void configure_vfs (void);
++void configure_vfs_plugin (void);
+ void jobs_cmd (void);
+ char *cd_dialog (void);
+ void symlink_dialog (const char *existing, const char *new, char **ret_existing, char **ret_new);
+diff --git a/src/filemanager/midnight.c b/src/filemanager/midnight.c
+index 6a30be4..db716e9 100644
+--- a/src/filemanager/midnight.c
++++ b/src/filemanager/midnight.c
+@@ -1085,6 +1085,9 @@ midnight_execute_cmd (Widget * sender, unsigned long command)
+     case CK_OptionsVfs:
+         configure_vfs ();
+         break;
++    case CK_OptionsVfsPlugin:
++        configure_vfs_plugin ();
++        break;
+ #endif
+     case CK_OptionsConfirm:
+         confirm_box ();
+-- 
+1.7.7.6
+

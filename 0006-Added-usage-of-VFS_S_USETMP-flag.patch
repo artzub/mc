@@ -1,0 +1,179 @@
+From 2539a17002483fb370232f9364dccbeb482a2d2a Mon Sep 17 00:00:00 2001
+From: Slava Zanko <slavazanko@gmail.com>
+Date: Sat, 23 Jul 2011 13:25:00 +0300
+Subject: [PATCH 06/10] Added usage of VFS_S_USETMP flag
+
+Signed-off-by: Slava Zanko <slavazanko@gmail.com>
+---
+ lib/vfs/direntry.c    |   38 ++++++++++++++++++++++++++------------
+ src/vfs/cpio/cpio.c   |    2 +-
+ src/vfs/fish/fish.c   |    2 +-
+ src/vfs/ftpfs/ftpfs.c |    2 +-
+ src/vfs/tar/tar.c     |    2 +-
+ 5 files changed, 30 insertions(+), 16 deletions(-)
+
+diff --git a/lib/vfs/direntry.c b/lib/vfs/direntry.c
+index 72dfbf2..96d70bf 100644
+--- a/lib/vfs/direntry.c
++++ b/lib/vfs/direntry.c
+@@ -127,7 +127,7 @@ vfs_s_free_inode (struct vfs_class *me, struct vfs_s_inode *ino)
+ 
+     CALL (free_inode) (me, ino);
+     g_free (ino->linkname);
+-    if (ino->localname != NULL)
++    if ((MEDATA->flags & VFS_S_USETMP) != 0 && ino->localname != NULL)
+     {
+         unlink (ino->localname);
+         g_free (ino->localname);
+@@ -714,7 +714,7 @@ vfs_s_close (void *fh)
+         MEDATA->linear_close (me, fh);
+     if (MEDATA->fh_close)
+         res = MEDATA->fh_close (me, fh);
+-    if (FH->changed && MEDATA->file_store)
++    if ((MEDATA->flags & VFS_S_USETMP) && FH->changed && MEDATA->file_store)
+     {
+         char *s = vfs_s_fullpath (me, FH->ino);
+         if (!s)
+@@ -800,11 +800,16 @@ vfs_s_getlocalcopy (const vfs_path_t * vpath)
+     vfs_file_handler_t *fh;
+     char *local = NULL;
+ 
++    if (vpath == NULL)
++        return NULL;
++
+     fh = vfs_s_open (vpath, O_RDONLY, 0);
+ 
+     if (fh != NULL)
+     {
+-        if ((fh->ino != NULL) && (fh->ino->localname != NULL))
++        struct vfs_class *me = vfs_path_get_by_index (vpath, -1)->class;
++        if ((MEDATA->flags & VFS_S_USETMP) != 0 && (fh->ino != NULL)
++            && (fh->ino->localname != NULL))
+             local = g_strdup (fh->ino->localname);
+ 
+         vfs_s_close (fh);
+@@ -1163,7 +1168,7 @@ vfs_s_fullpath (struct vfs_class *me, struct vfs_s_inode *ino)
+     if (!ino->ent)
+         ERRNOR (EAGAIN, NULL);
+ 
+-    if (!(MEDATA->flags & VFS_S_REMOTE))
++    if ((MEDATA->flags & VFS_S_USETMP) != 0)
+     {
+         /* archives */
+         char *newpath;
+@@ -1235,12 +1240,15 @@ vfs_s_open (const vfs_path_t * vpath, int flags, mode_t mode)
+         ent = vfs_s_generate_entry (path_element->class, name, dir, 0755);
+         ino = ent->ino;
+         vfs_s_insert_entry (path_element->class, dir, ent);
+-        tmp_handle = vfs_mkstemps (&ino->localname, path_element->class->name, name);
+-        g_free (q_mangle);
+-        if (tmp_handle == -1)
+-            return NULL;
++        if ((VFSDATA (path_element)->flags & VFS_S_USETMP) != 0)
++        {
++            tmp_handle = vfs_mkstemps (&ino->localname, path_element->class->name, name);
++            g_free (q_mangle);
++            if (tmp_handle == -1)
++                return NULL;
+ 
+-        close (tmp_handle);
++            close (tmp_handle);
++        }
+         was_changed = 1;
+     }
+ 
+@@ -1280,7 +1288,7 @@ vfs_s_open (const vfs_path_t * vpath, int flags, mode_t mode)
+         }
+     }
+ 
+-    if (fh->ino->localname)
++    if ((VFSDATA (path_element)->flags & VFS_S_USETMP) != 0 && fh->ino->localname != NULL)
+     {
+         fh->handle = open (fh->ino->localname, NO_LINEAR (flags), mode);
+         if (fh->handle == -1)
+@@ -1310,6 +1318,9 @@ vfs_s_retrieve_file (struct vfs_class *me, struct vfs_s_inode *ino)
+     off_t stat_size = ino->st.st_size;
+     vfs_file_handler_t fh;
+ 
++    if ((MEDATA->flags & VFS_S_USETMP) == 0)
++        return -1;
++
+     memset (&fh, 0, sizeof (fh));
+ 
+     fh.ino = ino;
+@@ -1398,7 +1409,7 @@ vfs_s_init_class (struct vfs_class *vclass, struct vfs_s_subclass *sub)
+     vclass->getid = vfs_s_getid;
+     vclass->nothingisopen = vfs_s_nothingisopen;
+     vclass->free = vfs_s_free;
+-    if (sub->flags & VFS_S_REMOTE)
++    if (sub->flags & VFS_S_USETMP)
+     {
+         vclass->getlocalcopy = vfs_s_getlocalcopy;
+         vclass->ungetlocalcopy = vfs_s_ungetlocalcopy;
+@@ -1406,7 +1417,10 @@ vfs_s_init_class (struct vfs_class *vclass, struct vfs_s_subclass *sub)
+     }
+     else
+     {
+-        sub->find_entry = vfs_s_find_entry_tree;
++        if (sub->flags & VFS_S_REMOTE)
++            sub->find_entry = vfs_s_find_entry_linear;
++        else
++            sub->find_entry = vfs_s_find_entry_tree;
+     }
+     vclass->setctl = vfs_s_setctl;
+     sub->dir_uptodate = vfs_s_dir_uptodate;
+diff --git a/src/vfs/cpio/cpio.c b/src/vfs/cpio/cpio.c
+index 3098bcb..5fca0d5 100644
+--- a/src/vfs/cpio/cpio.c
++++ b/src/vfs/cpio/cpio.c
+@@ -846,7 +846,7 @@ init_cpiofs (void)
+ {
+     static struct vfs_s_subclass cpio_subclass;
+ 
+-    cpio_subclass.flags = VFS_S_READONLY;
++    cpio_subclass.flags = VFS_S_READONLY;        /* FIXME: cpiofs used own temp files */
+     cpio_subclass.archive_check = cpio_super_check;
+     cpio_subclass.archive_same = cpio_super_same;
+     cpio_subclass.open_archive = cpio_open_archive;
+diff --git a/src/vfs/fish/fish.c b/src/vfs/fish/fish.c
+index 924dacf..d1a0998 100644
+--- a/src/vfs/fish/fish.c
++++ b/src/vfs/fish/fish.c
+@@ -1606,7 +1606,7 @@ init_fish (void)
+ 
+     tcp_init ();
+ 
+-    fish_subclass.flags = VFS_S_REMOTE;
++    fish_subclass.flags = VFS_S_REMOTE | VFS_S_USETMP;
+     fish_subclass.archive_same = fish_archive_same;
+     fish_subclass.open_archive = fish_open_archive;
+     fish_subclass.free_archive = fish_free_archive;
+diff --git a/src/vfs/ftpfs/ftpfs.c b/src/vfs/ftpfs/ftpfs.c
+index 9f053fc..29b01bd 100644
+--- a/src/vfs/ftpfs/ftpfs.c
++++ b/src/vfs/ftpfs/ftpfs.c
+@@ -2562,7 +2562,7 @@ init_ftpfs (void)
+ 
+     tcp_init ();
+ 
+-    ftpfs_subclass.flags = VFS_S_REMOTE;
++    ftpfs_subclass.flags = VFS_S_REMOTE | VFS_S_USETMP;
+     ftpfs_subclass.archive_same = ftpfs_archive_same;
+     ftpfs_subclass.open_archive = ftpfs_open_archive;
+     ftpfs_subclass.free_archive = ftpfs_free_archive;
+diff --git a/src/vfs/tar/tar.c b/src/vfs/tar/tar.c
+index 7f23cd7..0c8f987 100644
+--- a/src/vfs/tar/tar.c
++++ b/src/vfs/tar/tar.c
+@@ -903,7 +903,7 @@ init_tarfs (void)
+ {
+     static struct vfs_s_subclass tarfs_subclass;
+ 
+-    tarfs_subclass.flags = VFS_S_READONLY;
++    tarfs_subclass.flags = VFS_S_READONLY;       /* FIXME: tarfs used own temp files */
+     tarfs_subclass.archive_check = tar_super_check;
+     tarfs_subclass.archive_same = tar_super_same;
+     tarfs_subclass.open_archive = tar_open_archive;
+-- 
+1.7.7.6
+

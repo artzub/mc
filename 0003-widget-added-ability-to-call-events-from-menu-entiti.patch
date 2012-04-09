@@ -1,0 +1,251 @@
+From 6dcff85104afba34f72c75c3910fa69e866a61a6 Mon Sep 17 00:00:00 2001
+From: Slava Zanko <slavazanko@gmail.com>
+Date: Fri, 22 Apr 2011 12:26:34 +0300
+Subject: [PATCH 03/10] widget: added ability to call events from menu
+ entities. Added ability to call config dialog for
+ VFS-module
+
+Signed-off-by: Slava Zanko <slavazanko@gmail.com>
+---
+ lib/widget/menu.c          |   84 +++++++++++++++++++++++++++++++++++--------
+ lib/widget/menu.h          |   20 ++++++++++-
+ src/filemanager/midnight.c |    2 +-
+ src/vfs/sftpfs/sftpfs.c    |    4 ++
+ 4 files changed, 92 insertions(+), 18 deletions(-)
+
+diff --git a/lib/widget/menu.c b/lib/widget/menu.c
+index cf41c28..82fe774 100644
+--- a/lib/widget/menu.c
++++ b/lib/widget/menu.c
+@@ -77,8 +77,8 @@ menu_arrange (Menu * menu, dlg_shortcut_str get_shortcut)
+                 len = (size_t) hotkey_width (entry->text);
+                 menu->max_hotkey_len = max (menu->max_hotkey_len, len);
+ 
+-                if (get_shortcut != NULL)
+-                    entry->shortcut = get_shortcut (entry->command);
++                if (get_shortcut != NULL && entry->type == MENU_ENTITY_TYPE_COMMAND)
++                    entry->shortcut = get_shortcut (entry->u.command);
+ 
+                 if (entry->shortcut != NULL)
+                 {
+@@ -296,13 +296,32 @@ menubar_execute (WMenuBar * menubar)
+     const Menu *menu = g_list_nth_data (menubar->menu, menubar->selected);
+     const menu_entry_t *entry = g_list_nth_data (menu->entries, menu->selected);
+ 
+-    if ((entry != NULL) && (entry->command != CK_IgnoreKey))
++
++    if (entry == NULL)
++        return;
++
++
++    switch (entry->type)
+     {
+-        mc_global.is_right = (menubar->selected != 0);
+-        menubar_finish (menubar);
+-        menubar->widget.owner->callback (menubar->widget.owner, &menubar->widget,
+-                                         DLG_ACTION, entry->command, NULL);
+-        do_refresh ();
++    case MENU_ENTITY_TYPE_COMMAND:
++        if (entry->u.command != CK_IgnoreKey)
++        {
++            mc_global.is_right = (menubar->selected != 0);
++            menubar_finish (menubar);
++            menubar->widget.owner->callback (menubar->widget.owner, &menubar->widget,
++                                             DLG_ACTION, entry->u.command, NULL);
++            do_refresh ();
++        }
++        break;
++    case MENU_ENTITY_TYPE_EVENT:
++        if (entry->u.event.group != NULL && entry->u.event.name != NULL)
++        {
++            mc_global.is_right = (menubar->selected != 0);
++            menubar_finish (menubar);
++            mc_event_raise (entry->u.event.group, entry->u.event.name, entry->u.event.data);
++            do_refresh ();
++        }
++        break;
+     }
+ }
+ 
+@@ -322,7 +341,9 @@ menubar_down (WMenuBar * menubar)
+         menu->selected = (menu->selected + 1) % len;
+         entry = (menu_entry_t *) g_list_nth_data (menu->entries, menu->selected);
+     }
+-    while ((entry == NULL) || (entry->command == CK_IgnoreKey));
++    while ((entry == NULL)
++           || (entry->type == MENU_ENTITY_TYPE_COMMAND && entry->u.command == CK_IgnoreKey)
++           || (entry->type == MENU_ENTITY_TYPE_EVENT && entry->u.event.name == NULL));
+ 
+     menubar_paint_idx (menubar, menu->selected, MENU_SELECTED_COLOR);
+ }
+@@ -346,7 +367,9 @@ menubar_up (WMenuBar * menubar)
+             menu->selected--;
+         entry = (menu_entry_t *) g_list_nth_data (menu->entries, menu->selected);
+     }
+-    while ((entry == NULL) || (entry->command == CK_IgnoreKey));
++    while ((entry == NULL)
++           || (entry->type == MENU_ENTITY_TYPE_COMMAND && entry->u.command == CK_IgnoreKey)
++           || (entry->type == MENU_ENTITY_TYPE_EVENT && entry->u.event.name == NULL));
+ 
+     menubar_paint_idx (menubar, menu->selected, MENU_SELECTED_COLOR);
+ }
+@@ -370,7 +393,9 @@ menubar_first (WMenuBar * menubar)
+     {
+         entry = (menu_entry_t *) g_list_nth_data (menu->entries, menu->selected);
+ 
+-        if ((entry == NULL) || (entry->command == CK_IgnoreKey))
++        if ((entry == NULL)
++            || (entry->type == MENU_ENTITY_TYPE_COMMAND && entry->u.command == CK_IgnoreKey)
++            || (entry->type == MENU_ENTITY_TYPE_EVENT && entry->u.event.name == NULL))
+             menu->selected++;
+         else
+             break;
+@@ -400,7 +425,9 @@ menubar_last (WMenuBar * menubar)
+         menu->selected--;
+         entry = (menu_entry_t *) g_list_nth_data (menu->entries, menu->selected);
+     }
+-    while ((entry == NULL) || (entry->command == CK_IgnoreKey));
++    while ((entry == NULL)
++           || (entry->type == MENU_ENTITY_TYPE_COMMAND && entry->u.command == CK_IgnoreKey)
++           || (entry->type == MENU_ENTITY_TYPE_EVENT && entry->u.event.name == NULL));
+ 
+     menubar_paint_idx (menubar, menu->selected, MENU_SELECTED_COLOR);
+ }
+@@ -480,7 +507,9 @@ menubar_handle_key (WMenuBar * menubar, int key)
+         {
+             const menu_entry_t *entry = i->data;
+ 
+-            if ((entry != NULL) && (entry->command != CK_IgnoreKey)
++            if ((entry != NULL)
++                && ((entry->type == MENU_ENTITY_TYPE_COMMAND && entry->u.command != CK_IgnoreKey)
++                    || (entry->type == MENU_ENTITY_TYPE_EVENT && entry->u.event.name != NULL))
+                 && (entry->text.hotkey != NULL) && (key == g_ascii_tolower (entry->text.hotkey[0])))
+             {
+                 menu->selected = g_list_position (menu->entries, i);
+@@ -692,7 +721,9 @@ menubar_event (Gpm_Event * event, void *data)
+         if ((pos < 0) || (pos >= bottom_y - 3))
+             return MOU_NORMAL;
+ 
+-        if ((entry != NULL) && (entry->command != CK_IgnoreKey))
++        if ((entry != NULL)
++            && ((entry->type == MENU_ENTITY_TYPE_COMMAND && entry->u.command != CK_IgnoreKey)
++                || (entry->type == MENU_ENTITY_TYPE_EVENT && entry->u.event.name != NULL)))
+         {
+             menubar_paint_idx (menubar, menu->selected, MENU_ENTRY_COLOR);
+             menu->selected = pos;
+@@ -719,10 +750,31 @@ menu_entry_create (const char *name, unsigned long command)
+ {
+     menu_entry_t *entry;
+ 
+-    entry = g_new (menu_entry_t, 1);
++    entry = g_new0 (menu_entry_t, 1);
++    entry->first_letter = ' ';
++    entry->type = MENU_ENTITY_TYPE_COMMAND;
++    entry->text = parse_hotkey (name);
++    entry->u.command = command;
++    entry->shortcut = NULL;
++
++    return entry;
++}
++
++/* --------------------------------------------------------------------------------------------- */
++
++menu_entry_t *
++menu_entry_create_event (const char *name, const char *event_group, const char *event_name,
++                         gpointer event_data)
++{
++    menu_entry_t *entry;
++
++    entry = g_new0 (menu_entry_t, 1);
+     entry->first_letter = ' ';
++    entry->type = MENU_ENTITY_TYPE_EVENT;
+     entry->text = parse_hotkey (name);
+-    entry->command = command;
++    entry->u.event.group = event_group;
++    entry->u.event.name = event_name;
++    entry->u.event.data = event_data;
+     entry->shortcut = NULL;
+ 
+     return entry;
+diff --git a/lib/widget/menu.h b/lib/widget/menu.h
+index 591c07a..ed19ebd 100644
+--- a/lib/widget/menu.h
++++ b/lib/widget/menu.h
+@@ -15,13 +15,29 @@
+ 
+ /*** enums ***************************************************************************************/
+ 
++typedef enum
++{
++    MENU_ENTITY_TYPE_COMMAND,
++    MENU_ENTITY_TYPE_EVENT,
++} menu_entity_type_t;
++
+ /*** structures declarations (and typedefs of structures)*****************************************/
+ 
+ typedef struct menu_entry_t
+ {
++    menu_entity_type_t type;
+     unsigned char first_letter;
+     hotkey_t text;
+-    unsigned long command;
++    union
++    {
++        unsigned long command;
++        struct
++        {
++            const char *group;
++            const char *name;
++            gpointer data;
++        } event;
++    } u;
+     char *shortcut;
+ } menu_entry_t;
+ 
+@@ -54,6 +70,8 @@ typedef struct WMenuBar
+ /*** declarations of public functions ************************************************************/
+ 
+ menu_entry_t *menu_entry_create (const char *name, unsigned long command);
++menu_entry_t *menu_entry_create_event (const char *name, const char *event_group,
++                                       const char *event_name, gpointer event_data);
+ void menu_entry_free (menu_entry_t * me);
+ 
+ Menu *create_menu (const char *name, GList * entries, const char *help_node);
+diff --git a/src/filemanager/midnight.c b/src/filemanager/midnight.c
+index deac342..6a30be4 100644
+--- a/src/filemanager/midnight.c
++++ b/src/filemanager/midnight.c
+@@ -209,7 +209,7 @@ create_panel_menu (void)
+     entries = g_list_prepend (entries, menu_entry_create (_("S&hell link..."), CK_ConnectFish));
+ #endif
+ #ifdef ENABLE_VFS_SFTP
+-    entries = g_list_append (entries, menu_entry_create (_("S&FTP link..."), CK_ConnectSftp));
++    entries = g_list_prepend (entries, menu_entry_create (_("S&FTP link..."), CK_ConnectSftp));
+ #endif
+ #ifdef ENABLE_VFS_SMB
+     entries = g_list_prepend (entries, menu_entry_create (_("SM&B link..."), CK_ConnectSmb));
+diff --git a/src/vfs/sftpfs/sftpfs.c b/src/vfs/sftpfs/sftpfs.c
+index eadbc6f..d4c44c2 100644
+--- a/src/vfs/sftpfs/sftpfs.c
++++ b/src/vfs/sftpfs/sftpfs.c
+@@ -56,6 +56,7 @@
+ #include "lib/vfs/utilvfs.h"
+ #include "lib/vfs/xdirentry.h"
+ #include "lib/vfs/gc.h"         /* vfs_stamp_create */
++#include "lib/event.h"
+ 
+ #include "sftpfs.h"
+ #include "dialogs.h"
+@@ -1423,6 +1424,9 @@ init_sftpfs (void)
+     vfs_sftpfs_ops.rmdir = sftpfs_rmdir;
+     vfs_register_class (&vfs_sftpfs_ops);
+ 
++    mc_event_add ("vfs", "plugin_name_for_config_dialog", sftpfs_plugin_name_for_config_dialog,
++                  NULL, NULL);
++    mc_event_add ("vfs", "plugin_show_config_dialog", sftpfs_plugin_show_config_dialog, NULL, NULL);
+ }
+ 
+ /* --------------------------------------------------------------------------------------------- */
+-- 
+1.7.7.6
+

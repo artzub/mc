@@ -1,0 +1,52 @@
+From 407479355c50c6800a20a2827a657646970fb7dc Mon Sep 17 00:00:00 2001
+From: Slava Zanko <slavazanko@gmail.com>
+Date: Sat, 23 Jul 2011 12:13:51 +0300
+Subject: [PATCH 05/10] Added vfs_subclass_flags_t type
+
+Signed-off-by: Slava Zanko <slavazanko@gmail.com>
+---
+ lib/vfs/xdirentry.h |   14 +++++++++-----
+ 1 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/lib/vfs/xdirentry.h b/lib/vfs/xdirentry.h
+index 910536d..acc8b6d 100644
+--- a/lib/vfs/xdirentry.h
++++ b/lib/vfs/xdirentry.h
+@@ -32,10 +32,6 @@
+ #define FL_FOLLOW 1
+ #define FL_DIR 4
+ 
+-/* For vfs_s_subclass->flags */
+-#define VFS_S_REMOTE 1
+-#define VFS_S_READONLY 2
+-
+ #define ERRNOR(a, b) do { me->verrno = a; return b; } while (0)
+ 
+ #define MEDATA ((struct vfs_s_subclass *) me->data)
+@@ -52,6 +48,14 @@
+ 
+ /*** enums ***************************************************************************************/
+ 
++/* For vfs_s_subclass->flags */
++typedef enum
++{
++    VFS_S_REMOTE = 1L << 0,
++    VFS_S_READONLY = 1L << 1,
++    VFS_S_USETMP = 1L << 2,
++} vfs_subclass_flags_t;
++
+ /*** structures declarations (and typedefs of structures)*****************************************/
+ 
+ /* Single connection or archive */
+@@ -115,7 +119,7 @@ struct vfs_s_subclass
+ {
+     GList *supers;
+     int inode_counter;
+-    int flags;                  /* whether the subclass is remove, read-only etc */
++    vfs_subclass_flags_t flags; /* whether the subclass is remove, read-only etc */
+     dev_t rdev;
+     FILE *logfile;
+     int flush;                  /* if set to 1, invalidate directory cache */
+-- 
+1.7.7.6
+

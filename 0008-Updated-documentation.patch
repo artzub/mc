@@ -1,0 +1,537 @@
+From f6a255754b7aeef45e03bfb437236eca1f82aa56 Mon Sep 17 00:00:00 2001
+From: Ilia Maslakov <il.smind@gmail.com>
+Date: Mon, 18 Apr 2011 20:28:49 +0000
+Subject: [PATCH 08/10] Updated documentation
+
+    modified:   doc/INSTALL
+    modified:   doc/man/es/mc.1.in
+    modified:   doc/man/hu/mc.1.in
+    modified:   doc/man/it/mc.1.in
+    modified:   doc/man/mc.1.in
+    modified:   doc/man/pl/mc.1.in
+    modified:   doc/man/ru/mc.1.in
+    modified:   doc/man/sr/mc.1.in
+
+Signed-off-by: Ilia Maslakov <il.smind@gmail.com>
+---
+ doc/INSTALL        |    5 ++++
+ doc/man/es/mc.1.in |   56 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ doc/man/hu/mc.1.in |   52 ++++++++++++++++++++++++++++++++++++++++++++++
+ doc/man/it/mc.1.in |   52 ++++++++++++++++++++++++++++++++++++++++++++++
+ doc/man/mc.1.in    |   55 +++++++++++++++++++++++++++++++++++++++++++++++++
+ doc/man/pl/mc.1.in |   52 ++++++++++++++++++++++++++++++++++++++++++++++
+ doc/man/ru/mc.1.in |   58 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ doc/man/sr/mc.1.in |   55 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 8 files changed, 384 insertions(+), 1 deletions(-)
+
+diff --git a/doc/INSTALL b/doc/INSTALL
+index 500f671..d276241 100644
+--- a/doc/INSTALL
++++ b/doc/INSTALL
+@@ -20,6 +20,7 @@ Build requirements for GNU Midnight Commander
+ - slang or ncurses
+ - gettext
+ - cvs
++- libssh2 >= 1.2.5 is required only for sftp vfs (1.2.7 if you need ssh-agent support)
+ 
+ 
+ Installation instructions for GNU Midnight Commander
+@@ -170,6 +171,10 @@ VFS options:
+      (on by default)
+      Support for FISH vfs
+ 
++`--enable-vfs-sftp'
++     (off by default)
++     Support for SFTP vfs
++
+ `--enable-vfs-extfs'
+      (on by default)
+      Support for extfs
+diff --git a/doc/man/es/mc.1.in b/doc/man/es/mc.1.in
+index 66a4ec5..abf4b34 100644
+--- a/doc/man/es/mc.1.in
++++ b/doc/man/es/mc.1.in
+@@ -2688,6 +2688,9 @@ para manipular archivos en sistemas remotos a través de FTP;
+ .I FISH
+ para manipular archivos a través de conexiones a shell como rsh o ssh
+ y finalmente
++.I sftpfs
++(for manipulating files over SFTP connections).
++If the code was compiled with
+ .I MCfs
+ (Midnight Commander file system), un sistema de archivos para red. Si
+ el programa se compiló incluyendo
+@@ -2846,7 +2849,58 @@ Ejemplos:
+     smb://otramaquina
+     smb://invitado@maquina/publico/leyes
+ .fi
+-
++.\"NODE "  SFTP (SSH File Transfer Protocol) filesystem "
++.SH "  SFTP (SSH File Transfer Protocol) filesystem"
++The SFTP file system is a network based file system that allows you to
++manipulate the files in a remote machine as if they were local.
++.PP
++To connect to a remote machine, you just need to chdir
++into a special directory which name is in the following
++format:
++.PP
++.I sftp://[user@]machine:[port]/[remote\-dir]
++.PP
++The
++.I user,
++.I port
++and
++.I remote\-dir
++elements are optional.  If you specify the
++.I user
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I port
++\- specify the port used by remote server (22 by default).
++If the
++.I remote\-dir
++element is present, your current directory on the remote machine will be
++set to this one.
++.PP
++Examples:
++.PP
++.nf
++    sftp://onlyrsh.mx/linux/local
++    sftp://joe:password@want.compression.edu/private
++    sftp://joe@noncompressed.ssh.edu/private
++    sftp://joe@somehost.ssh.edu:2222/private
++.fi
++.\"NODE "  SFTP Configuration dialog "
++.SH "  SFTP Configuration dialog"
++This dialog is intended to enter and adjust information of SFTP server.
++Here you may assign following parameters:
++.I session name
++small description of SFTP server
++.I host
++hostname or IP address of SFTP server
++.I port
++port used by remote server
++.I user name
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I auth method
++authentication method of SFTP server (password, public keys, ssh-agent).
++.I SSH private key
++path to private key.
+ .\"NODE "  Undelete File System"
+ .SH "  Sistema de archivos de Recuperación"
+ En sistemas Linux, si el programa de configuración nos preguntó si queríamos usar
+diff --git a/doc/man/hu/mc.1.in b/doc/man/hu/mc.1.in
+index 2deff10..8c436be 100644
+--- a/doc/man/hu/mc.1.in
++++ b/doc/man/hu/mc.1.in
+@@ -2714,6 +2714,58 @@ Példák:
+     sh://joe@want.compression.edu:C/private
+     sh://joe@noncompressed.ssh.edu/private
+ .fi
++.\"NODE "  SFTP (SSH File Transfer Protocol) filesystem "
++.SH "  SFTP (SSH File Transfer Protocol) filesystem"
++The SFTP file system is a network based file system that allows you to
++manipulate the files in a remote machine as if they were local.
++.PP
++To connect to a remote machine, you just need to chdir
++into a special directory which name is in the following
++format:
++.PP
++.I sftp://[user@]machine:[port]/[remote\-dir]
++.PP
++The
++.I user,
++.I port
++and
++.I remote\-dir
++elements are optional.  If you specify the
++.I user
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I port
++\- specify the port used by remote server (22 by default).
++If the
++.I remote\-dir
++element is present, your current directory on the remote machine will be
++set to this one.
++.PP
++Examples:
++.PP
++.nf
++    sftp://onlyrsh.mx/linux/local
++    sftp://joe:password@want.compression.edu/private
++    sftp://joe@noncompressed.ssh.edu/private
++    sftp://joe@somehost.ssh.edu:2222/private
++.fi
++.\"NODE "  SFTP Configuration dialog "
++.SH "  SFTP Configuration dialog"
++This dialog is intended to enter and adjust information of SFTP server.
++Here you may assign following parameters:
++.I session name
++small description of SFTP server
++.I host
++hostname or IP address of SFTP server
++.I port
++port used by remote server
++.I user name
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I auth method
++authentication method of SFTP server (password, public keys, ssh-agent).
++.I SSH private key
++path to private key.
+ .\"NODE "  Undelete File System"
+ .SH "  Törlés visszaállítása"
+ (csak ext2; second extended filesystem)
+diff --git a/doc/man/it/mc.1.in b/doc/man/it/mc.1.in
+index 96d9044..b51390e 100644
+--- a/doc/man/it/mc.1.in
++++ b/doc/man/it/mc.1.in
+@@ -2724,6 +2724,58 @@ Esempi:
+     sh://joe@vuole.lacompressione.edu:C/privato
+     sh://joe@noncompresso.ssh.edu/privato
+ .fi
++.\"NODE "  SFTP (SSH File Transfer Protocol) filesystem "
++.SH "  SFTP (SSH File Transfer Protocol) filesystem"
++The SFTP file system is a network based file system that allows you to
++manipulate the files in a remote machine as if they were local.
++.PP
++To connect to a remote machine, you just need to chdir
++into a special directory which name is in the following
++format:
++.PP
++.I sftp://[user@]machine:[port]/[remote\-dir]
++.PP
++The
++.I user,
++.I port
++and
++.I remote\-dir
++elements are optional.  If you specify the
++.I user
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I port
++\- specify the port used by remote server (22 by default).
++If the
++.I remote\-dir
++element is present, your current directory on the remote machine will be
++set to this one.
++.PP
++Examples:
++.PP
++.nf
++    sftp://onlyrsh.mx/linux/local
++    sftp://joe:password@want.compression.edu/private
++    sftp://joe@noncompressed.ssh.edu/private
++    sftp://joe@somehost.ssh.edu:2222/private
++.fi
++.\"NODE "  SFTP Configuration dialog "
++.SH "  SFTP Configuration dialog"
++This dialog is intended to enter and adjust information of SFTP server.
++Here you may assign following parameters:
++.I session name
++small description of SFTP server
++.I host
++hostname or IP address of SFTP server
++.I port
++port used by remote server
++.I user name
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I auth method
++authentication method of SFTP server (password, public keys, ssh-agent).
++.I SSH private key
++path to private key.
+ .\"NODE "  Undelete File System"
+ .SH "  Recupero file cancellati"
+ Su sistemi Linux, se si richiede, tramite configure, di usare la
+diff --git a/doc/man/mc.1.in b/doc/man/mc.1.in
+index 62ed107..1978a99 100644
+--- a/doc/man/mc.1.in
++++ b/doc/man/mc.1.in
+@@ -3090,6 +3090,9 @@ system for Linux systems),
+ .I fish
+ (for manipulating files over shell connections such as rsh and ssh).
+ If the code was compiled with
++.I sftpfs
++(for manipulating files over SFTP connections).
++If the code was compiled with
+ .I smbfs
+ support, you can manipulate files on remote systems with the SMB (CIFS)
+ protocol.
+@@ -3217,6 +3220,58 @@ Examples:
+     sh://joe@noncompressed.ssh.edu/private
+     sh://joe@somehost.ssh.edu:2222/private
+ .fi
++.\"NODE "  SFTP (SSH File Transfer Protocol) filesystem "
++.SH "  SFTP (SSH File Transfer Protocol) filesystem"
++The SFTP file system is a network based file system that allows you to
++manipulate the files in a remote machine as if they were local.
++.PP
++To connect to a remote machine, you just need to chdir
++into a special directory which name is in the following
++format:
++.PP
++.I sftp://[user@]machine:[port]/[remote\-dir]
++.PP
++The
++.I user,
++.I port
++and
++.I remote\-dir
++elements are optional.  If you specify the
++.I user
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I port
++\- specify the port used by remote server (22 by default).
++If the
++.I remote\-dir
++element is present, your current directory on the remote machine will be
++set to this one.
++.PP
++Examples:
++.PP
++.nf
++    sftp://onlyrsh.mx/linux/local
++    sftp://joe:password@want.compression.edu/private
++    sftp://joe@noncompressed.ssh.edu/private
++    sftp://joe@somehost.ssh.edu:2222/private
++.fi
++.\"NODE "  SFTP Configuration dialog "
++.SH "  SFTP Configuration dialog"
++This dialog is intended to enter and adjust information of SFTP server.
++Here you may assign following parameters:
++.I session name
++small description of SFTP server
++.I host
++hostname or IP address of SFTP server
++.I port
++port used by remote server
++.I user name
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I auth method
++authentication method of SFTP server (password, public keys, ssh-agent).
++.I SSH private key
++path to private key.
+ .\"NODE "  Undelete File System"
+ .SH "  Undelete File System"
+ On Linux systems, if you asked configure to use the ext2fs undelete
+diff --git a/doc/man/pl/mc.1.in b/doc/man/pl/mc.1.in
+index f5cb1b7..100703f 100644
+--- a/doc/man/pl/mc.1.in
++++ b/doc/man/pl/mc.1.in
+@@ -2347,6 +2347,58 @@ Przykłady:
+     sh://joe@want.compression.edu:C/private
+     sh://joe@noncompressed.ssh.edu/private
+ .fi
++.\"NODE "  SFTP (SSH File Transfer Protocol) filesystem "
++.SH "  SFTP (SSH File Transfer Protocol) filesystem"
++The SFTP file system is a network based file system that allows you to
++manipulate the files in a remote machine as if they were local.
++.PP
++To connect to a remote machine, you just need to chdir
++into a special directory which name is in the following
++format:
++.PP
++.I sftp://[user@]machine:[port]/[remote\-dir]
++.PP
++The
++.I user,
++.I port
++and
++.I remote\-dir
++elements are optional.  If you specify the
++.I user
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I port
++\- specify the port used by remote server (22 by default).
++If the
++.I remote\-dir
++element is present, your current directory on the remote machine will be
++set to this one.
++.PP
++Examples:
++.PP
++.nf
++    sftp://onlyrsh.mx/linux/local
++    sftp://joe:password@want.compression.edu/private
++    sftp://joe@noncompressed.ssh.edu/private
++    sftp://joe@somehost.ssh.edu:2222/private
++.fi
++.\"NODE "  SFTP Configuration dialog "
++.SH "  SFTP Configuration dialog"
++This dialog is intended to enter and adjust information of SFTP server.
++Here you may assign following parameters:
++.I session name
++small description of SFTP server
++.I host
++hostname or IP address of SFTP server
++.I port
++port used by remote server
++.I user name
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I auth method
++authentication method of SFTP server (password, public keys, ssh-agent).
++.I SSH private key
++path to private key.
+ .\"NODE "  Undelete File System"
+ .SH "  Odzyskiwanie plików"
+ Na systemach Linuksowych, jeśli dodałeś w konfiguracji opcję przywracania
+diff --git a/doc/man/ru/mc.1.in b/doc/man/ru/mc.1.in
+index c789056..a38e233 100644
+--- a/doc/man/ru/mc.1.in
++++ b/doc/man/ru/mc.1.in
+@@ -3402,6 +3402,10 @@ MC может быть собран с поддержкой файловой с
+ .\"FIle transfer over SHell filesystem"
+ .br
+ .\"LINK2"
++Файловая система SFTP (SSH File Transfer Protocol)
++.\"SFTP (SSH File Transfer Protocol) filesystem"
++.br
++.\"LINK2"
+ Файловая система UFS (Undelete File System)
+ .\"Undelete File System"
+ .br
+@@ -3562,6 +3566,60 @@ bash\-совместимая оболочка shell.
+     sh://joe@noncompressed.ssh.edu/private
+     sh://joe@somehost.ssh.edu:2222/private
+ .fi
++.\"NODE "  SFTP (SSH File Transfer Protocol) filesystem"
++.SH "  Файловая система SFTP (SSH File Transfer Protocol)"
++Файловая система SFTP \- это сетевая файловая система, которая позволяет
++работать с файлами на удаленном компьютере так, как если бы они были
++расположены на вашем диске. Для того, чтобы это было возможно, на
++удаленном компьютере должен быть запущен sftp\-сервер.
++.PP
++Для соединения с удаленным компьютером нужно выполнить команду
++перехода в каталог (chdir), имя которого задается в следующем формате:
++.PP
++.I sftp://[user@]machine[:port]/[remote\-dir]
++.PP
++Элементы
++.IR user ", " port
++и
++.I remote\-dir
++не обязательны. Если задан элемент
++.IR user ,
++то Midnight Commander будет регистрироваться на удаленный компьютер под
++этим именем, в противном случае \- под тем именем, с которым вы
++зарегистрированы в локальной системе.
++Если задан
++.I port
++то он будет использован для поключения к удалённому компьютеру.
++Если задан элемент
++.IR remote\-dir ,
++то указанный каталог станет текущим после соединения с удаленным
++компьютером.
++.PP
++Примеры:
++.PP
++.nf
++    sftp://onlyrsh.mx/linux/local
++    sftp://joe:password@want.compression.edu/private
++    sftp://joe@noncompressed.ssh.edu/private
++    sftp://joe@somehost.ssh.edu:2222/private
++.fi
++.\"NODE "  SFTP config dialog "
++.SH "  Диалог настройки параметров SFTP соединения "
++Этот диалог предназначен для ввода и редактирования параметров SFTP сервера.
++Здесь можно задать следующие параметры:
++.I session name
++небольшое описание SFTP сервера
++.I host
++имя или IP\-адрес SFTP сервера
++.I port
++номер порта
++.I user name
++имя под которым Midnight Commander будт регистрироваться на удаленный компьютер,
++если поле пустое \- под тем именем, с которым вы зарегистрированы в локальной системе.
++.I auth method
++вариант аутентификации на удалённом компьютере (password, public keys, ssh-agent).
++.I SSH private key
++путь где находится файл ключа 'private key'.
+ .\"NODE "  Undelete File System"
+ .SH "  Файловая система UFS (Undelete File System)"
+ В ОС Linux можно сконфигурировать файловую систему ext2fs, используемую
+diff --git a/doc/man/sr/mc.1.in b/doc/man/sr/mc.1.in
+index 4364efe..a392b93 100644
+--- a/doc/man/sr/mc.1.in
++++ b/doc/man/sr/mc.1.in
+@@ -2607,6 +2607,9 @@ if the
+ .I fish
+ (за рад са датотекама преко повезивања љуске, као што су `rsh' и
+ `ssh') и, коначно,
++.I sftpfs
++(for manipulating files over SFTP connections).
++If the code was compiled with
+ .I mcfs
+ (систем датотека Поноћног наредника), систем датотека који је заснован
+ на мрежи. Уколико је код преведен са подршком за
+@@ -2733,6 +2736,58 @@ if the
+     sh://joe@hocu.komprimovanje.edu:C/private
+     sh://joe@nekomprimovan.ssh.edu/private
+ .fi
++.\"NODE "  SFTP (SSH File Transfer Protocol) filesystem "
++.SH "  SFTP (SSH File Transfer Protocol) filesystem"
++The SFTP file system is a network based file system that allows you to
++manipulate the files in a remote machine as if they were local.
++.PP
++To connect to a remote machine, you just need to chdir
++into a special directory which name is in the following
++format:
++.PP
++.I sftp://[user@]machine:[port]/[remote\-dir]
++.PP
++The
++.I user,
++.I port
++and
++.I remote\-dir
++elements are optional.  If you specify the
++.I user
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I port
++\- specify the port used by remote server (22 by default).
++If the
++.I remote\-dir
++element is present, your current directory on the remote machine will be
++set to this one.
++.PP
++Examples:
++.PP
++.nf
++    sftp://onlyrsh.mx/linux/local
++    sftp://joe:password@want.compression.edu/private
++    sftp://joe@noncompressed.ssh.edu/private
++    sftp://joe@somehost.ssh.edu:2222/private
++.fi
++.\"NODE "  SFTP Configuration dialog "
++.SH "  SFTP Configuration dialog"
++This dialog is intended to enter and adjust information of SFTP server.
++Here you may assign following parameters:
++.I session name
++small description of SFTP server
++.I host
++hostname or IP address of SFTP server
++.I port
++port used by remote server
++.I user name
++element, the Midnight Commander will try to login on the remote
++machine as that user, otherwise it will use your login name.
++.I auth method
++authentication method of SFTP server (password, public keys, ssh-agent).
++.I SSH private key
++path to private key.
+ .\"NODE "  Undelete File System"
+ .SH "  Систем датотека за одбрисање"
+ На ГНУ\-овим системима, уколико сте од програма `configure' захтевали
+-- 
+1.7.7.6
+
