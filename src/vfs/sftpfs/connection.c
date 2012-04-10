@@ -289,7 +289,7 @@ sftpfs_open_connection_ssh_password (struct vfs_s_super *super)
     if (super->path_element->password != NULL)
     {
         while ((rc = libssh2_userauth_password (super_data->session, super->path_element->user,
-                                               super->path_element->password)) ==
+                                                super->path_element->password)) ==
                LIBSSH2_ERROR_EAGAIN);
         if (rc == 0)
             return TRUE;
@@ -304,7 +304,7 @@ sftpfs_open_connection_ssh_password (struct vfs_s_super *super)
         return FALSE;
     }
     while ((rc = libssh2_userauth_password (super_data->session, super->path_element->user,
-                                           passwd)) == LIBSSH2_ERROR_EAGAIN);
+                                            passwd)) == LIBSSH2_ERROR_EAGAIN);
 
     if (rc == 0)
     {
@@ -424,7 +424,6 @@ sftpfs_close_connection (struct vfs_s_super *super, const char *shutdown_message
     if (super_data->session != NULL)
     {
         libssh2_session_disconnect (super_data->session, shutdown_message);
-        libssh2_session_free (super_data->session);
         super_data->session = NULL;
     }
     if (super_data->fingerprint != NULL)

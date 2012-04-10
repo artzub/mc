@@ -39,6 +39,11 @@
 
 /*** file scope type declarations ****************************************************************/
 
+typedef struct
+{
+    LIBSSH2_SFTP_HANDLE *handle;
+} sftpfs_dir_data_t;
+
 /*** file scope variables ************************************************************************/
 
 /*** file scope functions ************************************************************************/
@@ -46,4 +51,81 @@
 
 /* --------------------------------------------------------------------------------------------- */
 /*** public functions ****************************************************************************/
+/* --------------------------------------------------------------------------------------------- */
+
+void *
+sftpfs_opendir (const vfs_path_t * vpath)
+{
+    sftpfs_dir_data_t *sftpfs_dir;
+    struct vfs_s_super *super;
+    sftpfs_super_data_t *super_data;
+    const vfs_path_element_t *path_element;
+    LIBSSH2_SFTP_HANDLE *handle;
+
+    path_element = vfs_path_get_by_index (vpath, -1);
+
+    if (vfs_s_get_path (vpath, &super, 0) == NULL)
+        return NULL;
+
+    super_data = (sftpfs_super_data_t *) super->data;
+
+    handle =
+        libssh2_sftp_opendir (super_data->sftp_session, sftpfs_fix_filename (path_element->path));
+    if (handle == NULL)
+    {
+        if (libssh2_session_last_errno (super_data->session) != LIBSSH2_ERROR_EAGAIN)
+            return NULL;
+        sftpfs_waitsocket (super_data);
+        if (handle == NULL)
+            return NULL;
+    }
+
+    sftpfs_dir = g_new0 (sftpfs_dir_data_t, 1);
+    sftpfs_dir->handle = handle;
+
+    return (void *) sftpfs_dir;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+void *
+sftpfs_readdir (void *data)
+{
+    char mem[BUF_MEDIUM];
+    LIBSSH2_SFTP_ATTRIBUTES attrs;
+    sftpfs_dir_data_t *sftpfs_dir = (sftpfs_dir_data_t *) data;
+
+    static union vfs_dirent sftpfs_dirent;
+
+    int rc;
+
+    rc = libssh2_sftp_readdir (sftpfs_dir->handle, mem, sizeof (mem), &attrs);
+
+    /* rc is the length of the file name in the mem buffer */
+    if (rc <= 0)
+    {
+        vfs_print_message (_("sftp: Listing done."));
+        return NULL;
+    }
+
+    if (mem[0] != '\0')
+        vfs_print_message (_("sftp: (Ctrl-G break) Listing... %s"), mem);
+
+    g_strlcpy (sftpfs_dirent.dent.d_name, mem, BUF_MEDIUM);
+    compute_namelen (&sftpfs_dirent.dent);
+    return &sftpfs_dirent;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+int
+sftpfs_closedir (void *data)
+{
+    int ret;
+    sftpfs_dir_data_t *sftpfs_dir = (sftpfs_dir_data_t *) data;
+    ret = libssh2_sftp_closedir (sftpfs_dir->handle);
+    g_free (sftpfs_dir);
+    return ret;
+}
+
 /* --------------------------------------------------------------------------------------------- */

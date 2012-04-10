@@ -29,6 +29,7 @@
 
 #include "lib/global.h"
 #include "lib/vfs/gc.h"
+#include "lib/tty/tty.h"        /* tty_enable_interrupt_key () */
 
 #include "internal.h"
 
@@ -41,7 +42,6 @@ struct vfs_class sftpfs_class;
 /*** file scope type declarations ****************************************************************/
 
 /*** file scope variables ************************************************************************/
-
 
 /*** file scope functions ************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
@@ -160,6 +160,62 @@ sftpfs_cb_open (const vfs_path_t * vpath, int flags, mode_t mode)
     return file_handler;
 }
 
+/* --------------------------------------------------------------------------------------------- */
+
+static void *
+sftpfs_cb_opendir (const vfs_path_t * vpath)
+{
+    /* reset interrupt flag */
+    tty_got_interrupt ();
+
+    return sftpfs_opendir (vpath);
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static void *
+sftpfs_cb_readdir (void *data)
+{
+    if (tty_got_interrupt ())
+    {
+        tty_disable_interrupt_key ();
+        return NULL;
+    }
+
+    return sftpfs_readdir (data);
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_closedir (void *data)
+{
+    return sftpfs_closedir (data);
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_lstat (const vfs_path_t * vpath, struct stat *buf)
+{
+    return sftpfs_lstat (vpath, buf);
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_stat (const vfs_path_t * vpath, struct stat *buf)
+{
+    return sftpfs_stat (vpath, buf);
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_fstat (void *data, struct stat *buf)
+{
+    return sftpfs_fstat (data, buf);
+}
 
 /* --------------------------------------------------------------------------------------------- */
 /*** public functions ****************************************************************************/
@@ -170,27 +226,36 @@ sftpfs_cb_open (const vfs_path_t * vpath, int flags, mode_t mode)
  * @return the VFS class structure.
  */
 
-struct vfs_class *
+void
 sftpfs_init_class (void)
 {
     memset (&sftpfs_class, 0, sizeof (struct vfs_class));
     sftpfs_class.name = "sftpfs";
     sftpfs_class.prefix = "sftp";
     sftpfs_class.flags = VFSF_NOLINKS;
+}
 
+/* --------------------------------------------------------------------------------------------- */
+
+void
+sftpfs_init_class_callbacks (void)
+{
     sftpfs_class.init = sftpfs_cb_init;
     sftpfs_class.done = sftpfs_cb_done;
     sftpfs_class.open = sftpfs_cb_open;
+
+    sftpfs_class.opendir = sftpfs_cb_opendir;
+    sftpfs_class.readdir = sftpfs_cb_readdir;
+    sftpfs_class.closedir = sftpfs_cb_closedir;
+
+    sftpfs_class.stat = sftpfs_cb_stat;
+    sftpfs_class.lstat = sftpfs_cb_lstat;
+    sftpfs_class.fstat = sftpfs_cb_fstat;
+
     /*
        sftpfs_class.read = sftpfs_read;
        sftpfs_class.write = sftpfs_write;
        sftpfs_class.close = sftpfs_close;
-       sftpfs_class.opendir = sftpfs_opendir;
-       sftpfs_class.readdir = sftpfs_readdir;
-       sftpfs_class.closedir = sftpfs_closedir;
-       sftpfs_class.stat = sftpfs_stat;
-       sftpfs_class.lstat = sftpfs_lstat;
-       sftpfs_class.fstat = sftpfs_fstat;
        sftpfs_class.chmod = sftpfs_chmod;
        sftpfs_class.chown = sftpfs_chown;
        sftpfs_class.utime = sftpfs_utime;
@@ -205,7 +270,6 @@ sftpfs_init_class (void)
        sftpfs_class.mkdir = sftpfs_mkdir;
        sftpfs_class.rmdir = sftpfs_rmdir;
      */
-    return &sftpfs_class;
 }
 
 /* --------------------------------------------------------------------------------------------- */

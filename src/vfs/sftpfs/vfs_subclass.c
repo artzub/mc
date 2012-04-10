@@ -34,13 +34,13 @@
 
 /*** global variables ****************************************************************************/
 
+struct vfs_s_subclass sftpfs_subclass;
+
 /*** file scope macro definitions ****************************************************************/
 
 /*** file scope type declarations ****************************************************************/
 
 /*** file scope variables ************************************************************************/
-
-static struct vfs_s_subclass sftpfs_subclass;
 
 /*** file scope functions ************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
@@ -125,6 +125,11 @@ sftpfs_cb_open_connection (struct vfs_s_super *super,
     if (super->path_element->user == NULL)
         super->path_element->user = user_name;
 
+    super->name = g_strdup (PATH_SEP_STR);
+    super->root =
+        vfs_s_new_inode (vpath_element->class, super,
+                         vfs_s_default_stat (vpath_element->class, S_IFDIR | 0755));
+
     sftpfs_fill_connection_data_from_config (super);
 
     return sftpfs_open_connection (super);
@@ -167,16 +172,22 @@ sftpfs_cb_dir_load (struct vfs_class *me, struct vfs_s_inode *dir, char *remote_
  * @return the VFS subclass structure.
  */
 
-struct vfs_s_subclass *
+void
 sftpfs_init_subclass (void)
 {
     memset (&sftpfs_subclass, 0, sizeof (struct vfs_s_subclass));
     sftpfs_subclass.flags = VFS_S_REMOTE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+void
+sftpfs_init_subclass_callbacks (void)
+{
     sftpfs_subclass.archive_same = sftpfs_cb_is_equal_connection;
     sftpfs_subclass.open_archive = sftpfs_cb_open_connection;
     sftpfs_subclass.free_archive = sftpfs_cb_close_connection;
     sftpfs_subclass.dir_load = sftpfs_cb_dir_load;
-    return &sftpfs_subclass;
 }
 
 /* --------------------------------------------------------------------------------------------- */

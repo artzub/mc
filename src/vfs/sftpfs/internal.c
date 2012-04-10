@@ -47,3 +47,155 @@ GString *sftpfs_filename_buffer = NULL;
 /* --------------------------------------------------------------------------------------------- */
 /*** public functions ****************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
+
+const char *
+sftpfs_fix_filename (const char *file_name)
+{
+    g_string_printf (sftpfs_filename_buffer, "%c%s", PATH_SEP, file_name);
+    return sftpfs_filename_buffer->str;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+int
+sftpfs_waitsocket (sftpfs_super_data_t * super_data)
+{
+    struct timeval timeout = { 10, 0 };
+    fd_set fd;
+    fd_set *writefd = NULL;
+    fd_set *readfd = NULL;
+    int dir;
+
+    FD_ZERO (&fd);
+    FD_SET (super_data->socket_handle, &fd);
+
+    /* now make sure we wait in the correct direction */
+    dir = libssh2_session_block_directions (super_data->session);
+
+    if ((dir & LIBSSH2_SESSION_BLOCK_INBOUND) != 0)
+        readfd = &fd;
+
+    if ((dir & LIBSSH2_SESSION_BLOCK_OUTBOUND) != 0)
+        writefd = &fd;
+
+    return select (super_data->socket_handle + 1, readfd, writefd, NULL, &timeout);
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+int
+sftpfs_lstat (const vfs_path_t * vpath, struct stat *buf)
+{
+    struct vfs_s_super *super;
+    sftpfs_super_data_t *super_data;
+    LIBSSH2_SFTP_ATTRIBUTES attrs;
+    int res;
+    const vfs_path_element_t *path_element;
+
+    path_element = vfs_path_get_by_index (vpath, -1);
+
+    if (vfs_s_get_path (vpath, &super, 0) == NULL)
+        return -1;
+
+    if (super == NULL)
+        return -1;
+
+    super_data = (sftpfs_super_data_t *) super->data;
+    if (super_data->sftp_session == NULL)
+        return -1;
+
+    res = libssh2_sftp_stat_ex (super_data->sftp_session, sftpfs_fix_filename (path_element->path),
+                                sftpfs_filename_buffer->len, LIBSSH2_SFTP_LSTAT, &attrs);
+
+    if (res < 0)
+    {
+        char *err = NULL;
+        int err_len;
+
+        libssh2_session_last_error (super_data->session, &err, &err_len, 1);
+        g_free (err);
+        return -1;
+    }
+
+    if ((attrs.flags & LIBSSH2_SFTP_ATTR_UIDGID) != 0)
+    {
+        buf->st_uid = attrs.uid;
+        buf->st_gid = attrs.gid;
+    }
+
+    if ((attrs.flags & LIBSSH2_SFTP_ATTR_ACMODTIME) != 0)
+    {
+        buf->st_atime = attrs.atime;
+        buf->st_mtime = attrs.mtime;
+        buf->st_ctime = attrs.mtime;
+    }
+
+    if ((attrs.flags & LIBSSH2_SFTP_ATTR_SIZE) != 0)
+        buf->st_size = attrs.filesize;
+
+    if ((attrs.flags & LIBSSH2_SFTP_ATTR_PERMISSIONS) != 0)
+        buf->st_mode = attrs.permissions;
+
+    return 0;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+int
+sftpfs_stat (const vfs_path_t * vpath, struct stat *buf)
+{
+    struct vfs_s_super *super;
+    sftpfs_super_data_t *super_data;
+    LIBSSH2_SFTP_ATTRIBUTES attrs;
+    int res;
+    const vfs_path_element_t *path_element;
+
+    path_element = vfs_path_get_by_index (vpath, -1);
+
+    if (vfs_s_get_path (vpath, &super, 0) == NULL)
+        return -1;
+
+    if (super == NULL)
+        return -1;
+
+    super_data = (sftpfs_super_data_t *) super->data;
+    if (super_data->sftp_session == NULL)
+        return -1;
+
+    res = libssh2_sftp_stat_ex (super_data->sftp_session, sftpfs_fix_filename (path_element->path),
+                                sftpfs_filename_buffer->len, LIBSSH2_SFTP_STAT, &attrs);
+
+    if (res < 0)
+    {
+        char *err = NULL;
+        int err_len;
+
+        libssh2_session_last_error (super_data->session, &err, &err_len, 1);
+        g_free (err);
+        return -1;
+    }
+
+    buf->st_nlink = 1;
+    if ((attrs.flags & LIBSSH2_SFTP_ATTR_UIDGID) != 0)
+    {
+        buf->st_uid = attrs.uid;
+        buf->st_gid = attrs.gid;
+    }
+
+    if ((attrs.flags & LIBSSH2_SFTP_ATTR_ACMODTIME) != 0)
+    {
+        buf->st_atime = attrs.atime;
+        buf->st_mtime = attrs.mtime;
+        buf->st_ctime = attrs.mtime;
+    }
+
+    if ((attrs.flags & LIBSSH2_SFTP_ATTR_SIZE) != 0)
+        buf->st_size = attrs.filesize;
+
+    if ((attrs.flags & LIBSSH2_SFTP_ATTR_PERMISSIONS) != 0)
+        buf->st_mode = attrs.permissions;
+
+    return 0;
+}
+
+/* --------------------------------------------------------------------------------------------- */

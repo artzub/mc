@@ -53,16 +53,17 @@
 void
 init_sftpfs (void)
 {
-    struct vfs_class *class;
-    struct vfs_s_subclass *subclass;
-
     tcp_init ();
 
-    class = sftpfs_init_class ();
-    subclass = sftpfs_init_subclass ();
+    sftpfs_init_class ();
+    sftpfs_init_subclass ();
 
-    vfs_s_init_class (class, subclass);
-    vfs_register_class (class);
+    vfs_s_init_class (&sftpfs_class, &sftpfs_subclass);
+
+    sftpfs_init_class_callbacks ();
+    sftpfs_init_subclass_callbacks ();
+
+    vfs_register_class (&sftpfs_class);
 }
 
 /* --------------------------------------------------------------------------------------------- */
