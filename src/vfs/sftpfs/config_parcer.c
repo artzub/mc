@@ -34,6 +34,8 @@
 
 /*** file scope macro definitions ****************************************************************/
 
+#define SFTP_DEFAULT_PORT 22
+
 /*** file scope type declarations ****************************************************************/
 
 /*** file scope variables ************************************************************************/
@@ -48,7 +50,8 @@
 void
 sftpfs_fill_connection_data_from_config (struct vfs_s_super *super)
 {
-    (void) super;
+    if (super->path_element->port == 0)
+        super->path_element->port = SFTP_DEFAULT_PORT;
 }
 
 /* --------------------------------------------------------------------------------------------- */

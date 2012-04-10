@@ -47,16 +47,16 @@ static struct vfs_s_subclass sftpfs_subclass;
 /**
  * Callback for checking if connection is equal to existing connection.
  *
- * @param vpath_element connetion
- * @param super data with exists connection
- * @param vpath unused
- * @param cookie unused
+ * @param vpath_element path element with connetion data
+ * @param super         data with exists connection
+ * @param vpath         unused
+ * @param cookie        unused
  * @return TRUE if connections is equal, FALSE otherwise
  */
 
 static gboolean
 sftpfs_cb_is_equal_connection (const vfs_path_element_t * vpath_element, struct vfs_s_super *super,
-                            const vfs_path_t * vpath, void *cookie)
+                               const vfs_path_t * vpath, void *cookie)
 {
     int port;
     char *user_name;
@@ -86,10 +86,18 @@ sftpfs_cb_is_equal_connection (const vfs_path_element_t * vpath_element, struct 
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/**
+ * Callback for opening new connection.
+ *
+ * @param super         connection data
+ * @param vpath         unused
+ * @param vpath_element path element with connetion data
+ * @return 0 if success, -1 otherwise
+ */
 
 static int
 sftpfs_cb_open_connection (struct vfs_s_super *super,
-                     const vfs_path_t * vpath, const vfs_path_element_t * vpath_element)
+                           const vfs_path_t * vpath, const vfs_path_element_t * vpath_element)
 {
     char *user_name = NULL;
 
@@ -123,6 +131,34 @@ sftpfs_cb_open_connection (struct vfs_s_super *super,
 }
 
 /* --------------------------------------------------------------------------------------------- */
+/**
+ * Callback for closing connection.
+ *
+ * @param me    unused
+ * @param super connection data
+ */
+
+static void
+sftpfs_cb_close_connection (struct vfs_class *me, struct vfs_s_super *super)
+{
+    (void) me;
+    sftpfs_close_connection (super, "Normal Shutdown");
+    g_free (super->data);
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_dir_load (struct vfs_class *me, struct vfs_s_inode *dir, char *remote_path)
+{
+    (void) me;
+    (void) dir;
+    (void) remote_path;
+
+    return 0;
+}
+
+/* --------------------------------------------------------------------------------------------- */
 /*** public functions ****************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
 /**
@@ -138,10 +174,8 @@ sftpfs_init_subclass (void)
     sftpfs_subclass.flags = VFS_S_REMOTE;
     sftpfs_subclass.archive_same = sftpfs_cb_is_equal_connection;
     sftpfs_subclass.open_archive = sftpfs_cb_open_connection;
-    /*
-       sftpfs_subclass.free_archive = sftpfs_free_archive;
-       sftpfs_subclass.dir_load = sftpfs_dir_load;
-     */
+    sftpfs_subclass.free_archive = sftpfs_cb_close_connection;
+    sftpfs_subclass.dir_load = sftpfs_cb_dir_load;
     return &sftpfs_subclass;
 }
 

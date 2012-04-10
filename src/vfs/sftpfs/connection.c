@@ -55,6 +55,12 @@
 
 /*** file scope functions ************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
+/**
+ * Create socket to host.
+ *
+ * @param super connection data
+ * @return socket descriptor number, -1 if any error was occured
+ */
 
 static int
 sftpfs_open_socket (struct vfs_s_super *super)
@@ -172,6 +178,7 @@ sftpfs_recognize_auth_types (struct vfs_s_super *super)
         super_data->auth_type |= PASSWORD;
     if (strstr (userauthlist, "publickey") != NULL)
         super_data->auth_type |= PUBKEY;
+    g_free (userauthlist);
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -272,18 +279,21 @@ sftpfs_open_connection_ssh_password (struct vfs_s_super *super)
     sftpfs_super_data_t *super_data;
     char *p, *passwd;
     gboolean ret_value = FALSE;
+    int rc;
 
     super_data = (sftpfs_super_data_t *) super->data;
 
     if ((super_data->auth_type & PASSWORD) == 0)
         return FALSE;
 
-    if (libssh2_userauth_password (super_data->session, super->path_element->user,
-                                   super->path_element->password) == 0)
+    if (super->path_element->password != NULL)
     {
-        return TRUE;
+        while ((rc = libssh2_userauth_password (super_data->session, super->path_element->user,
+                                               super->path_element->password)) ==
+               LIBSSH2_ERROR_EAGAIN);
+        if (rc == 0)
+            return TRUE;
     }
-
     p = g_strdup_printf (_("sftp: Enter password for %s "), super->path_element->user);
 
     passwd = vfs_get_password (p);
@@ -293,10 +303,17 @@ sftpfs_open_connection_ssh_password (struct vfs_s_super *super)
         vfs_print_message (_("sftp: Password is empty."));
         return FALSE;
     }
-    if (libssh2_userauth_password (super_data->session, super->path_element->user,
-                                   super->path_element->password) == 0)
+    while ((rc = libssh2_userauth_password (super_data->session, super->path_element->user,
+                                           passwd)) == LIBSSH2_ERROR_EAGAIN);
+
+    if (rc == 0)
     {
-        ret_value = TRUE;
+        if (super->path_element->password != NULL)
+        {
+            g_free (super->path_element->password);
+            super->path_element->password = passwd;
+        }
+        return TRUE;
     }
 
     g_free (passwd);
@@ -306,6 +323,12 @@ sftpfs_open_connection_ssh_password (struct vfs_s_super *super)
 /* --------------------------------------------------------------------------------------------- */
 /*** public functions ****************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
+/**
+ * Open new connection.
+ *
+ * @param super connection data
+ * @return 0 if success, -1 otherwise
+ */
 
 int
 sftpfs_open_connection (struct vfs_s_super *super)
@@ -314,10 +337,6 @@ sftpfs_open_connection (struct vfs_s_super *super)
     sftpfs_super_data_t *super_data;
 
     super_data = (sftpfs_super_data_t *) super->data;
-
-    /* TODO: shouled we call init on any connection? */
-    if (libssh2_init (0) != 0)
-        return -1;
 
     /* Create a session instance */
     super_data->session = libssh2_session_init ();
@@ -329,6 +348,11 @@ sftpfs_open_connection (struct vfs_s_super *super)
      * and establishing the connection
      */
     super_data->socket_handle = sftpfs_open_socket (super);
+    if (super_data->socket_handle == -1)
+    {
+        vfs_print_message (_("sftp: Unable to create socket"));
+        goto deinit_by_error;
+    }
 
     /* ... start it up. This will trade welcome banners, exchange keys,
      * and setup crypto, compression, and MAC layers
@@ -364,6 +388,25 @@ sftpfs_open_connection (struct vfs_s_super *super)
     return 0;
 
   deinit_by_error:
+    sftpfs_close_connection (super, "Shutdown with errors");
+    vfs_print_message (_("sftp: Connect to host failed."));
+    return -1;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+/**
+ * Close connection.
+ *
+ * @param super            connection data
+ * @param shutdown_message message for shutdown functions
+ */
+
+void
+sftpfs_close_connection (struct vfs_s_super *super, const char *shutdown_message)
+{
+    sftpfs_super_data_t *super_data;
+
+    super_data = (sftpfs_super_data_t *) super->data;
 
     if (super_data->agent != NULL)
     {
@@ -371,15 +414,27 @@ sftpfs_open_connection (struct vfs_s_super *super)
         libssh2_agent_free (super_data->agent);
         super_data->agent = NULL;
     }
+
+    if (super_data->sftp_session != NULL)
+    {
+        libssh2_sftp_shutdown (super_data->sftp_session);
+        super_data->sftp_session = NULL;
+    }
+
     if (super_data->session != NULL)
     {
-        libssh2_session_disconnect (super_data->session, "Shutdown with errors");
+        libssh2_session_disconnect (super_data->session, shutdown_message);
         libssh2_session_free (super_data->session);
         super_data->session = NULL;
     }
-    close (super_data->socket_handle);
-    vfs_print_message (_("sftp: Connect to host failed."));
-    return -1;
+    if (super_data->fingerprint != NULL)
+        super_data->fingerprint = NULL;
+
+    if (super_data->socket_handle != -1)
+    {
+        close (super_data->socket_handle);
+        super_data->socket_handle = -1;
+    }
 }
 
 /* --------------------------------------------------------------------------------------------- */

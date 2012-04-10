@@ -120,4 +120,3 @@ sftpfs_open_file (vfs_file_handler_t * file_handler, int flags, mode_t mode)
 }
 
 /* --------------------------------------------------------------------------------------------- */
-

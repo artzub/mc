@@ -55,6 +55,9 @@ sftpfs_cb_init (struct vfs_class *me)
 {
     (void) me;
 
+    if (libssh2_init (0) != 0)
+        return 0;
+
     sftpfs_filename_buffer = g_string_new ("");
     return 1;
 }
@@ -72,6 +75,7 @@ sftpfs_cb_done (struct vfs_class *me)
     (void) me;
 
     g_string_free (sftpfs_filename_buffer, TRUE);
+    libssh2_exit ();
 }
 
 /* --------------------------------------------------------------------------------------------- */

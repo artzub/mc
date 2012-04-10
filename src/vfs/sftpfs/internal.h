@@ -56,6 +56,8 @@ struct vfs_s_subclass *sftpfs_init_subclass (void);
 gboolean sftpfs_open_file (vfs_file_handler_t * file_handler, int flags, mode_t mode);
 void sftpfs_fill_connection_data_from_config (struct vfs_s_super *super);
 int sftpfs_open_connection (struct vfs_s_super *super);
+void sftpfs_close_connection (struct vfs_s_super *super, const char *shutdown_message);
+
 
 /*** inline functions ****************************************************************************/
 #endif /* MC__VFS_SFTPFS_INTERNAL_H */
