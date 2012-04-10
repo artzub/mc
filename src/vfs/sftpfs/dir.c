@@ -1,5 +1,5 @@
 /* Virtual File System: SFTP file system.
-   The internal functions: files
+   The internal functions: dirs
 
    Copyright (C) 2011
    The Free Software Foundation, Inc.
@@ -42,6 +42,7 @@
 typedef struct
 {
     LIBSSH2_SFTP_HANDLE *handle;
+    sftpfs_super_data_t *super_data;
 } sftpfs_dir_data_t;
 
 /*** file scope variables ************************************************************************/
@@ -54,7 +55,7 @@ typedef struct
 /* --------------------------------------------------------------------------------------------- */
 
 void *
-sftpfs_opendir (const vfs_path_t * vpath)
+sftpfs_opendir (const vfs_path_t * vpath, GError ** error)
 {
     sftpfs_dir_data_t *sftpfs_dir;
     struct vfs_s_super *super;
@@ -69,19 +70,31 @@ sftpfs_opendir (const vfs_path_t * vpath)
 
     super_data = (sftpfs_super_data_t *) super->data;
 
-    handle =
-        libssh2_sftp_opendir (super_data->sftp_session, sftpfs_fix_filename (path_element->path));
-    if (handle == NULL)
+    while (TRUE)
     {
-        if (libssh2_session_last_errno (super_data->session) != LIBSSH2_ERROR_EAGAIN)
+        int libssh_errno;
+
+        handle =
+            libssh2_sftp_opendir (super_data->sftp_session,
+                                  sftpfs_fix_filename (path_element->path));
+
+        if (handle != NULL)
+            break;
+
+        libssh_errno = libssh2_session_last_errno (super_data->session);
+        if (libssh_errno != LIBSSH2_ERROR_EAGAIN)
+        {
+            sftpfs_ssherror_to_gliberror (super_data, libssh_errno, error);
             return NULL;
-        sftpfs_waitsocket (super_data);
-        if (handle == NULL)
+        }
+        sftpfs_waitsocket (super_data, error);
+        if (error != NULL && *error != NULL)
             return NULL;
     }
 
     sftpfs_dir = g_new0 (sftpfs_dir_data_t, 1);
     sftpfs_dir->handle = handle;
+    sftpfs_dir->super_data = super_data;
 
     return (void *) sftpfs_dir;
 }
@@ -89,27 +102,31 @@ sftpfs_opendir (const vfs_path_t * vpath)
 /* --------------------------------------------------------------------------------------------- */
 
 void *
-sftpfs_readdir (void *data)
+sftpfs_readdir (void *data, GError ** error)
 {
     char mem[BUF_MEDIUM];
     LIBSSH2_SFTP_ATTRIBUTES attrs;
     sftpfs_dir_data_t *sftpfs_dir = (sftpfs_dir_data_t *) data;
-
     static union vfs_dirent sftpfs_dirent;
-
     int rc;
 
-    rc = libssh2_sftp_readdir (sftpfs_dir->handle, mem, sizeof (mem), &attrs);
-
-    /* rc is the length of the file name in the mem buffer */
-    if (rc <= 0)
+    while ((rc =
+            libssh2_sftp_readdir (sftpfs_dir->handle, mem, sizeof (mem),
+                                  &attrs)) == LIBSSH2_ERROR_EAGAIN)
     {
-        vfs_print_message (_("sftp: Listing done."));
+        sftpfs_waitsocket (sftpfs_dir->super_data, error);
+        if (error != NULL && *error != NULL)
+            return NULL;
+    }
+
+    if (rc < 0)
+    {
+        sftpfs_ssherror_to_gliberror (sftpfs_dir->super_data, rc, error);
         return NULL;
     }
 
-    if (mem[0] != '\0')
-        vfs_print_message (_("sftp: (Ctrl-G break) Listing... %s"), mem);
+    if (rc == 0)
+        return NULL;
 
     g_strlcpy (sftpfs_dirent.dent.d_name, mem, BUF_MEDIUM);
     compute_namelen (&sftpfs_dirent.dent);
@@ -119,13 +136,16 @@ sftpfs_readdir (void *data)
 /* --------------------------------------------------------------------------------------------- */
 
 int
-sftpfs_closedir (void *data)
+sftpfs_closedir (void *data, GError ** error)
 {
-    int ret;
+    int rc;
     sftpfs_dir_data_t *sftpfs_dir = (sftpfs_dir_data_t *) data;
-    ret = libssh2_sftp_closedir (sftpfs_dir->handle);
+
+    (void) error;
+
+    rc = libssh2_sftp_closedir (sftpfs_dir->handle);
     g_free (sftpfs_dir);
-    return ret;
+    return rc;
 }
 
 /* --------------------------------------------------------------------------------------------- */

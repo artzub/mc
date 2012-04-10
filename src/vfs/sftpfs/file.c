@@ -58,13 +58,14 @@ typedef struct
  * Open new SFTP file.
  *
  * @param file_handler the file handler data
- * @param flags flags (see man 2 open)
- * @param mode mode (see man 2 open)
- * return TRUE if connection was created successfully, FALSE otherwise
+ * @param flags        flags (see man 2 open)
+ * @param mode         mode (see man 2 open)
+ * @param error        pointer to the error handler
+ * @return TRUE if connection was created successfully, FALSE otherwise
  */
 
 gboolean
-sftpfs_open_file (vfs_file_handler_t * file_handler, int flags, mode_t mode)
+sftpfs_open_file (vfs_file_handler_t * file_handler, int flags, mode_t mode, GError ** error)
 {
     unsigned long sftp_open_flags = 0;
     int sftp_open_mode = 0;
@@ -73,6 +74,10 @@ sftpfs_open_file (vfs_file_handler_t * file_handler, int flags, mode_t mode)
     char *name;
 
     (void) mode;
+
+    name = vfs_s_fullpath (&sftpfs_class, file_handler->ino);
+    if (name == NULL)
+        return FALSE;
 
     super_data = (sftpfs_super_data_t *) file_handler->ino->super->data;
     file_handler_data = g_new0 (sftpfs_file_handler_data_t, 1);
@@ -88,23 +93,27 @@ sftpfs_open_file (vfs_file_handler_t * file_handler, int flags, mode_t mode)
     else
         sftp_open_flags = LIBSSH2_FXF_READ;
 
-    name = vfs_s_fullpath (&sftpfs_class, file_handler->ino);
-    if (name == NULL)
+    while (TRUE)
     {
-        g_free (file_handler_data);
-        return FALSE;
+        int libssh_errno;
+
+        file_handler_data->handle =
+            libssh2_sftp_open (super_data->sftp_session, sftpfs_fix_filename (name),
+                               sftp_open_flags, sftp_open_mode);
+
+        if (file_handler_data->handle != NULL)
+            break;
+
+        libssh_errno = libssh2_session_last_errno (super_data->session);
+        if (libssh_errno != LIBSSH2_ERROR_EAGAIN)
+        {
+            sftpfs_ssherror_to_gliberror (super_data, libssh_errno, error);
+            g_free (name);
+            return FALSE;
+        }
     }
 
-    file_handler_data->handle =
-        libssh2_sftp_open (super_data->sftp_session, sftpfs_fix_filename (name),
-                           sftp_open_flags, sftp_open_mode);
     g_free (name);
-
-    if (file_handler_data->handle == NULL)
-    {
-        g_free (file_handler_data);
-        return FALSE;
-    }
 
     file_handler_data->flags = flags;
     file_handler_data->mode = mode;
@@ -115,7 +124,7 @@ sftpfs_open_file (vfs_file_handler_t * file_handler, int flags, mode_t mode)
 /* --------------------------------------------------------------------------------------------- */
 
 int
-sftpfs_fstat (void *data, struct stat *buf)
+sftpfs_fstat (void *data, struct stat *buf, GError ** error)
 {
     int res;
     LIBSSH2_SFTP_ATTRIBUTES attrs;
@@ -127,21 +136,19 @@ sftpfs_fstat (void *data, struct stat *buf)
     if (sftpfs_fh->handle == NULL)
         return -1;
 
-    do
-    {
-        res = libssh2_sftp_fstat_ex (sftpfs_fh->handle, &attrs, 0);
 
-        if (res < 0)
-        {
-            if (libssh2_session_last_errno (super_data->session) != LIBSSH2_ERROR_EAGAIN)
-                return -1;
-            sftpfs_waitsocket (super_data);
-        }
+    while ((res = libssh2_sftp_fstat_ex (sftpfs_fh->handle, &attrs, 0)) == LIBSSH2_ERROR_EAGAIN)
+    {
+        sftpfs_waitsocket (super_data, error);
+        if (error != NULL && *error != NULL)
+            return -1;
     }
-    while (res < 0);
 
     if (res < 0)
+    {
+        sftpfs_ssherror_to_gliberror (super_data, res, error);
         return -1;
+    }
 
     if ((attrs.flags & LIBSSH2_SFTP_ATTR_UIDGID) != 0)
     {

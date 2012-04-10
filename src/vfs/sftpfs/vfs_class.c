@@ -96,6 +96,7 @@ sftpfs_cb_open (const vfs_path_t * vpath, int flags, mode_t mode)
     struct vfs_s_super *super;
     const char *path_super;
     struct vfs_s_inode *path_inode;
+    GError *error = NULL;
     gboolean is_changed = FALSE;
 
     path_element = vfs_path_get_by_index (vpath, -1);
@@ -148,8 +149,9 @@ sftpfs_cb_open (const vfs_path_t * vpath, int flags, mode_t mode)
     file_handler->linear = 0;
     file_handler->data = NULL;
 
-    if (!sftpfs_open_file (file_handler, flags, mode))
+    if (!sftpfs_open_file (file_handler, flags, mode, &error))
     {
+        sftpfs_show_error (&error);
         g_free (file_handler);
         return NULL;
     }
@@ -165,10 +167,15 @@ sftpfs_cb_open (const vfs_path_t * vpath, int flags, mode_t mode)
 static void *
 sftpfs_cb_opendir (const vfs_path_t * vpath)
 {
+    GError *error = NULL;
+    void *ret_value;
+
     /* reset interrupt flag */
     tty_got_interrupt ();
 
-    return sftpfs_opendir (vpath);
+    ret_value = sftpfs_opendir (vpath, &error);
+    sftpfs_show_error (&error);
+    return ret_value;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -176,13 +183,25 @@ sftpfs_cb_opendir (const vfs_path_t * vpath)
 static void *
 sftpfs_cb_readdir (void *data)
 {
+    GError *error = NULL;
+    union vfs_dirent *sftpfs_dirent;
+
     if (tty_got_interrupt ())
     {
         tty_disable_interrupt_key ();
         return NULL;
     }
 
-    return sftpfs_readdir (data);
+    sftpfs_dirent = sftpfs_readdir (data, &error);
+    if (!sftpfs_show_error (&error))
+    {
+        if (sftpfs_dirent != NULL)
+            vfs_print_message (_("sftp: (Ctrl-G break) Listing... %s"), sftpfs_dirent.dent.d_name);
+        else
+            vfs_print_message (_("sftp: Listing done."));
+    }
+
+    return sftpfs_dirent;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -190,7 +209,12 @@ sftpfs_cb_readdir (void *data)
 static int
 sftpfs_cb_closedir (void *data)
 {
-    return sftpfs_closedir (data);
+    int rc;
+    GError *error = NULL;
+
+    rc = sftpfs_closedir (data, &error);
+    sftpfs_show_error (&error);
+    return rc;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -198,7 +222,12 @@ sftpfs_cb_closedir (void *data)
 static int
 sftpfs_cb_lstat (const vfs_path_t * vpath, struct stat *buf)
 {
-    return sftpfs_lstat (vpath, buf);
+    int rc;
+    GError *error = NULL;
+
+    rc = sftpfs_lstat (vpath, buf, &error);
+    sftpfs_show_error (&error);
+    return rc;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -206,7 +235,12 @@ sftpfs_cb_lstat (const vfs_path_t * vpath, struct stat *buf)
 static int
 sftpfs_cb_stat (const vfs_path_t * vpath, struct stat *buf)
 {
-    return sftpfs_stat (vpath, buf);
+    int rc;
+    GError *error = NULL;
+
+    rc = sftpfs_stat (vpath, buf, &error);
+    sftpfs_show_error (&error);
+    return rc;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -214,7 +248,84 @@ sftpfs_cb_stat (const vfs_path_t * vpath, struct stat *buf)
 static int
 sftpfs_cb_fstat (void *data, struct stat *buf)
 {
-    return sftpfs_fstat (data, buf);
+    int rc;
+    GError *error = NULL;
+
+    rc = sftpfs_fstat (data, buf, &error);
+    sftpfs_show_error (&error);
+    return rc;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_readlink (const vfs_path_t * vpath, char *buf, size_t size)
+{
+    int rc;
+    GError *error = NULL;
+
+    rc = sftpfs_readlink (vpath, buf, size, &error);
+    sftpfs_show_error (&error);
+    return rc;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_utime (const vfs_path_t * vpath, struct utimbuf *times)
+{
+    (void) vpath;
+    (void) times;
+
+    return 0;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_symlink (const vfs_path_t * vpath1, const vfs_path_t * vpath2)
+{
+    int rc;
+    GError *error = NULL;
+
+    rc = sftpfs_symlink (vpath1, vpath2, &error);
+    sftpfs_show_error (&error);
+    return rc;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_mknod (const vfs_path_t * vpath, mode_t mode, dev_t dev)
+{
+    (void) vpath;
+    (void) mode;
+    (void) dev;
+
+    return 0;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_link (const vfs_path_t * vpath1, const vfs_path_t * vpath2)
+{
+    (void) vpath1;
+    (void) vpath2;
+
+    return 0;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_chown (const vfs_path_t * vpath, uid_t owner, gid_t group)
+{
+    (void) vpath;
+    (void) owner;
+    (void) group;
+
+    return 0;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -242,7 +353,6 @@ sftpfs_init_class_callbacks (void)
 {
     sftpfs_class.init = sftpfs_cb_init;
     sftpfs_class.done = sftpfs_cb_done;
-    sftpfs_class.open = sftpfs_cb_open;
 
     sftpfs_class.opendir = sftpfs_cb_opendir;
     sftpfs_class.readdir = sftpfs_cb_readdir;
@@ -251,22 +361,24 @@ sftpfs_init_class_callbacks (void)
     sftpfs_class.stat = sftpfs_cb_stat;
     sftpfs_class.lstat = sftpfs_cb_lstat;
     sftpfs_class.fstat = sftpfs_cb_fstat;
+    sftpfs_class.readlink = sftpfs_cb_readlink;
+    sftpfs_class.symlink = sftpfs_cb_symlink;
+    sftpfs_class.link = sftpfs_cb_link;
+    sftpfs_class.utime = sftpfs_cb_utime;
+    sftpfs_class.mknod = sftpfs_cb_mknod;
+    sftpfs_class.chown = sftpfs_cb_chown;
+
+    sftpfs_class.open = sftpfs_cb_open;
 
     /*
        sftpfs_class.read = sftpfs_read;
        sftpfs_class.write = sftpfs_write;
        sftpfs_class.close = sftpfs_close;
        sftpfs_class.chmod = sftpfs_chmod;
-       sftpfs_class.chown = sftpfs_chown;
-       sftpfs_class.utime = sftpfs_utime;
-       sftpfs_class.readlink = sftpfs_readlink;
-       sftpfs_class.symlink = sftpfs_symlink;
-       sftpfs_class.link = sftpfs_link;
        sftpfs_class.unlink = sftpfs_unlink;
        sftpfs_class.rename = sftpfs_rename;
        sftpfs_class.ferrno = sftpfs_errno;
        sftpfs_class.lseek = sftpfs_lseek;
-       sftpfs_class.mknod = sftpfs_mknod;
        sftpfs_class.mkdir = sftpfs_mkdir;
        sftpfs_class.rmdir = sftpfs_rmdir;
      */

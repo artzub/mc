@@ -99,7 +99,9 @@ static int
 sftpfs_cb_open_connection (struct vfs_s_super *super,
                            const vfs_path_t * vpath, const vfs_path_element_t * vpath_element)
 {
+    GError *error = NULL;
     char *user_name = NULL;
+    int ret_value;
 
     (void) vpath;
 
@@ -132,7 +134,9 @@ sftpfs_cb_open_connection (struct vfs_s_super *super,
 
     sftpfs_fill_connection_data_from_config (super);
 
-    return sftpfs_open_connection (super);
+    ret_value = sftpfs_open_connection (super, &error);
+    sftpfs_show_error (&error);
+    return ret_value;
 }
 
 /* --------------------------------------------------------------------------------------------- */
@@ -146,8 +150,11 @@ sftpfs_cb_open_connection (struct vfs_s_super *super,
 static void
 sftpfs_cb_close_connection (struct vfs_class *me, struct vfs_s_super *super)
 {
+    GError *error = NULL;
+
     (void) me;
-    sftpfs_close_connection (super, "Normal Shutdown");
+    sftpfs_close_connection (super, "Normal Shutdown", &error);
+    sftpfs_show_error (&error);
     g_free (super->data);
 }
 

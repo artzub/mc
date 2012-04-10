@@ -48,6 +48,35 @@ GString *sftpfs_filename_buffer = NULL;
 /*** public functions ****************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
 
+gboolean
+sftpfs_show_error (GError ** error)
+{
+    if (error == NULL || *error == NULL)
+        return FALSE;
+
+    vfs_print_message ("%s", (*error)->message);
+    g_error_free (*error);
+    *error = NULL;
+    return TRUE;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+void
+sftpfs_ssherror_to_gliberror (sftpfs_super_data_t * super_data, int libssh_errno, GError ** error)
+{
+    char *err = NULL;
+    int err_len;
+
+    g_return_if_fail (error == NULL || *error == NULL);
+
+    libssh2_session_last_error (super_data->session, &err, &err_len, 1);
+    g_set_error (error, MC_ERROR, libssh_errno, "%s", err);
+    g_free (err);
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
 const char *
 sftpfs_fix_filename (const char *file_name)
 {
@@ -58,13 +87,15 @@ sftpfs_fix_filename (const char *file_name)
 /* --------------------------------------------------------------------------------------------- */
 
 int
-sftpfs_waitsocket (sftpfs_super_data_t * super_data)
+sftpfs_waitsocket (sftpfs_super_data_t * super_data, GError ** error)
 {
     struct timeval timeout = { 10, 0 };
     fd_set fd;
     fd_set *writefd = NULL;
     fd_set *readfd = NULL;
     int dir;
+
+    (void) error;
 
     FD_ZERO (&fd);
     FD_SET (super_data->socket_handle, &fd);
@@ -84,7 +115,7 @@ sftpfs_waitsocket (sftpfs_super_data_t * super_data)
 /* --------------------------------------------------------------------------------------------- */
 
 int
-sftpfs_lstat (const vfs_path_t * vpath, struct stat *buf)
+sftpfs_lstat (const vfs_path_t * vpath, struct stat *buf, GError ** error)
 {
     struct vfs_s_super *super;
     sftpfs_super_data_t *super_data;
@@ -104,16 +135,22 @@ sftpfs_lstat (const vfs_path_t * vpath, struct stat *buf)
     if (super_data->sftp_session == NULL)
         return -1;
 
-    res = libssh2_sftp_stat_ex (super_data->sftp_session, sftpfs_fix_filename (path_element->path),
-                                sftpfs_filename_buffer->len, LIBSSH2_SFTP_LSTAT, &attrs);
+
+
+    while ((res =
+            libssh2_sftp_stat_ex (super_data->sftp_session,
+                                  sftpfs_fix_filename (path_element->path),
+                                  sftpfs_filename_buffer->len, LIBSSH2_SFTP_LSTAT,
+                                  &attrs)) == LIBSSH2_ERROR_EAGAIN)
+    {
+        sftpfs_waitsocket (super_data, error);
+        if (error != NULL && *error != NULL)
+            return -1;
+    }
 
     if (res < 0)
     {
-        char *err = NULL;
-        int err_len;
-
-        libssh2_session_last_error (super_data->session, &err, &err_len, 1);
-        g_free (err);
+        sftpfs_ssherror_to_gliberror (super_data, res, error);
         return -1;
     }
 
@@ -142,7 +179,7 @@ sftpfs_lstat (const vfs_path_t * vpath, struct stat *buf)
 /* --------------------------------------------------------------------------------------------- */
 
 int
-sftpfs_stat (const vfs_path_t * vpath, struct stat *buf)
+sftpfs_stat (const vfs_path_t * vpath, struct stat *buf, GError ** error)
 {
     struct vfs_s_super *super;
     sftpfs_super_data_t *super_data;
@@ -162,16 +199,20 @@ sftpfs_stat (const vfs_path_t * vpath, struct stat *buf)
     if (super_data->sftp_session == NULL)
         return -1;
 
-    res = libssh2_sftp_stat_ex (super_data->sftp_session, sftpfs_fix_filename (path_element->path),
-                                sftpfs_filename_buffer->len, LIBSSH2_SFTP_STAT, &attrs);
+    while ((res =
+            libssh2_sftp_stat_ex (super_data->sftp_session,
+                                  sftpfs_fix_filename (path_element->path),
+                                  sftpfs_filename_buffer->len, LIBSSH2_SFTP_STAT,
+                                  &attrs)) == LIBSSH2_ERROR_EAGAIN)
+    {
+        sftpfs_waitsocket (super_data, error);
+        if (error != NULL && *error != NULL)
+            return -1;
+    }
 
     if (res < 0)
     {
-        char *err = NULL;
-        int err_len;
-
-        libssh2_session_last_error (super_data->session, &err, &err_len, 1);
-        g_free (err);
+        sftpfs_ssherror_to_gliberror (super_data, res, error);
         return -1;
     }
 
@@ -194,6 +235,99 @@ sftpfs_stat (const vfs_path_t * vpath, struct stat *buf)
 
     if ((attrs.flags & LIBSSH2_SFTP_ATTR_PERMISSIONS) != 0)
         buf->st_mode = attrs.permissions;
+
+    return 0;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+int
+sftpfs_readlink (const vfs_path_t * vpath, char *buf, size_t size, GError ** error)
+{
+    struct vfs_s_super *super;
+    sftpfs_super_data_t *super_data;
+    int res;
+    const vfs_path_element_t *path_element;
+
+    path_element = vfs_path_get_by_index (vpath, -1);
+
+    if (vfs_s_get_path (vpath, &super, 0) == NULL)
+        return -1;
+
+    if (super == NULL)
+        return -1;
+
+    super_data = (sftpfs_super_data_t *) super->data;
+    if (super_data->sftp_session == NULL)
+        return -1;
+
+
+    while ((res =
+            libssh2_sftp_readlink (super_data->sftp_session,
+                                   sftpfs_fix_filename (path_element->path), buf,
+                                   size)) == LIBSSH2_ERROR_EAGAIN)
+    {
+        sftpfs_waitsocket (super_data, error);
+        if (error != NULL && *error != NULL)
+            return -1;
+    }
+
+    if (res < 0)
+    {
+        sftpfs_ssherror_to_gliberror (super_data, res, error);
+        return -1;
+    }
+
+    return res;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+int
+sftpfs_symlink (const vfs_path_t * vpath1, const vfs_path_t * vpath2, GError ** error)
+{
+    struct vfs_s_super *super;
+    sftpfs_super_data_t *super_data;
+    const vfs_path_element_t *path_element1;
+    const vfs_path_element_t *path_element2;
+    char *tmp_path;
+    int res;
+
+    path_element2 = vfs_path_get_by_index (vpath2, -1);
+
+    if (vfs_s_get_path (vpath2, &super, 0) == NULL)
+        return -1;
+
+    if (super == NULL)
+        return -1;
+
+    super_data = (sftpfs_super_data_t *) super->data;
+    if (super_data->sftp_session == NULL)
+        return -1;
+
+    tmp_path = g_strdup_printf ("%c%s", PATH_SEP, path_element2->path);
+    path_element1 = vfs_path_get_by_index (vpath1, -1);
+
+
+    while ((res =
+            libssh2_sftp_symlink_ex (super_data->sftp_session,
+                                     sftpfs_fix_filename (path_element1->path),
+                                     sftpfs_filename_buffer->len, tmp_path, strlen (tmp_path),
+                                     LIBSSH2_SFTP_SYMLINK)) == LIBSSH2_ERROR_EAGAIN)
+    {
+        sftpfs_waitsocket (super_data, error);
+        if (error != NULL && *error != NULL)
+        {
+            g_free (tmp_path);
+            return -1;
+        }
+    }
+    g_free (tmp_path);
+    if (res < 0)
+    {
+        sftpfs_ssherror_to_gliberror (super_data, res, error);
+        return -1;
+    }
 
     return 0;
 }

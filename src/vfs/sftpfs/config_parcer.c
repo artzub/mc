@@ -48,8 +48,9 @@
 /* --------------------------------------------------------------------------------------------- */
 
 void
-sftpfs_fill_connection_data_from_config (struct vfs_s_super *super)
+sftpfs_fill_connection_data_from_config (struct vfs_s_super *super, GError ** error)
 {
+    (void) error;
     if (super->path_element->port == 0)
         super->path_element->port = SFTP_DEFAULT_PORT;
 }
