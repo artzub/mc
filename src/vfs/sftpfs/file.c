@@ -173,3 +173,88 @@ sftpfs_fstat (void *data, struct stat *buf, GError ** error)
 }
 
 /* --------------------------------------------------------------------------------------------- */
+
+ssize_t
+sftpfs_read_file (vfs_file_handler_t * file_handler, char *buffer, size_t count, GError ** error)
+{
+    ssize_t rc;
+    sftpfs_file_handler_data_t *file_handler_data;
+    sftpfs_super_data_t *super_data;
+
+    if (file_handler == NULL || file_handler->data == NULL)
+    {
+        g_set_error (error, MC_ERROR, -1, _("sftp: No file handler data present for reading file"));
+        return -1;
+    }
+
+    file_handler_data = file_handler->data;
+    super_data = (sftpfs_super_data_t *) file_handler->ino->super->data;
+
+    while ((rc =
+            libssh2_sftp_read (file_handler_data->handle, buffer, count)) == LIBSSH2_ERROR_EAGAIN)
+    {
+        sftpfs_waitsocket (super_data, error);
+        if (error != NULL && *error != NULL)
+            return -1;
+    }
+
+    if (rc < 0)
+    {
+        sftpfs_ssherror_to_gliberror (super_data, rc, error);
+        return -1;
+    }
+    file_handler->pos = (off_t) libssh2_sftp_tell64 (file_handler_data->handle);
+
+    return rc;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+ssize_t
+sftpfs_write_file (vfs_file_handler_t * file_handler, const char *buffer, size_t count,
+                   GError ** error)
+{
+    ssize_t rc;
+    sftpfs_file_handler_data_t *file_handler_data;
+    sftpfs_super_data_t *super_data;
+
+    file_handler_data = (sftpfs_file_handler_data_t *) file_handler->data;
+    super_data = (sftpfs_super_data_t *) file_handler->ino->super->data;
+
+    file_handler->pos = (off_t) libssh2_sftp_tell64 (file_handler_data->handle);
+
+    while ((rc =
+            libssh2_sftp_write (file_handler_data->handle, buffer, count)) == LIBSSH2_ERROR_EAGAIN)
+    {
+        sftpfs_waitsocket (super_data, error);
+        if (error != NULL && *error != NULL)
+            return -1;
+    }
+
+    if (rc < 0)
+    {
+        sftpfs_ssherror_to_gliberror (super_data, rc, error);
+    }
+    return rc;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+int
+sftpfs_close_file (vfs_file_handler_t * file_handler, GError ** error)
+{
+    sftpfs_file_handler_data_t *file_handler_data;
+
+    (void) error;
+
+    file_handler_data = (sftpfs_file_handler_data_t *) file_handler->data;
+    if (file_handler_data == NULL)
+        return -1;
+
+    libssh2_sftp_close (file_handler_data->handle);
+
+    g_free (file_handler_data);
+    return 0;
+}
+
+/* --------------------------------------------------------------------------------------------- */

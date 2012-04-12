@@ -78,6 +78,11 @@ int sftpfs_closedir (void *data, GError ** error);
 
 gboolean sftpfs_open_file (vfs_file_handler_t * file_handler, int flags, mode_t mode,
                            GError ** error);
+ssize_t sftpfs_read_file (vfs_file_handler_t * file_handler, char *buffer, size_t count,
+                          GError ** error);
+ssize_t sftpfs_write_file (vfs_file_handler_t * file_handler, const char *buffer, size_t count,
+                           GError ** error);
+int sftpfs_close_file (vfs_file_handler_t * file_handler, GError ** error);
 
 /*** inline functions ****************************************************************************/
 #endif /* MC__VFS_SFTPFS_INTERNAL_H */

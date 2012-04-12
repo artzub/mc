@@ -196,7 +196,7 @@ sftpfs_cb_readdir (void *data)
     if (!sftpfs_show_error (&error))
     {
         if (sftpfs_dirent != NULL)
-            vfs_print_message (_("sftp: (Ctrl-G break) Listing... %s"), sftpfs_dirent.dent.d_name);
+            vfs_print_message (_("sftp: (Ctrl-G break) Listing... %s"), sftpfs_dirent->dent.d_name);
         else
             vfs_print_message (_("sftp: Listing done."));
     }
@@ -329,6 +329,68 @@ sftpfs_cb_chown (const vfs_path_t * vpath, uid_t owner, gid_t group)
 }
 
 /* --------------------------------------------------------------------------------------------- */
+
+static ssize_t
+sftpfs_cb_read (void *data, char *buffer, size_t count)
+{
+    int rc;
+    GError *error = NULL;
+    vfs_file_handler_t *fh = (vfs_file_handler_t *) data;
+
+    if (tty_got_interrupt ())
+    {
+        tty_disable_interrupt_key ();
+        return 0;
+    }
+
+    rc = sftpfs_read_file (fh, buffer, count, &error);
+    sftpfs_show_error (&error);
+    return rc;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static ssize_t
+sftpfs_cb_write (void *data, const char *buf, size_t nbyte)
+{
+    int rc;
+    GError *error = NULL;
+    vfs_file_handler_t *fh = (vfs_file_handler_t *) data;
+
+    rc = sftpfs_write_file (fh, buf, nbyte, &error);
+    sftpfs_show_error (&error);
+    return rc;
+}
+
+/* --------------------------------------------------------------------------------------------- */
+
+static int
+sftpfs_cb_close (void *data)
+{
+    int rc;
+    GError *error = NULL;
+    struct vfs_s_super *super;
+    vfs_file_handler_t *file_handler = (vfs_file_handler_t *) data;
+
+    super = file_handler->ino->super;
+
+    super->fd_usage--;
+    if (super->fd_usage == 0)
+        vfs_stamp_create (&sftpfs_class, super);
+
+    rc = sftpfs_close_file (file_handler, &error);
+    sftpfs_show_error (&error);
+
+    if (file_handler->handle != -1)
+        close (file_handler->handle);
+
+    vfs_s_free_inode (&sftpfs_class, file_handler->ino);
+    g_free (file_handler);
+
+    return rc;
+}
+
+/* --------------------------------------------------------------------------------------------- */
 /*** public functions ****************************************************************************/
 /* --------------------------------------------------------------------------------------------- */
 /**
@@ -369,11 +431,11 @@ sftpfs_init_class_callbacks (void)
     sftpfs_class.chown = sftpfs_cb_chown;
 
     sftpfs_class.open = sftpfs_cb_open;
+    sftpfs_class.read = sftpfs_cb_read;
+    sftpfs_class.write = sftpfs_cb_write;
+    sftpfs_class.close = sftpfs_cb_close;
 
     /*
-       sftpfs_class.read = sftpfs_read;
-       sftpfs_class.write = sftpfs_write;
-       sftpfs_class.close = sftpfs_close;
        sftpfs_class.chmod = sftpfs_chmod;
        sftpfs_class.unlink = sftpfs_unlink;
        sftpfs_class.rename = sftpfs_rename;

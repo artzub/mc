@@ -132,7 +132,7 @@ sftpfs_cb_open_connection (struct vfs_s_super *super,
         vfs_s_new_inode (vpath_element->class, super,
                          vfs_s_default_stat (vpath_element->class, S_IFDIR | 0755));
 
-    sftpfs_fill_connection_data_from_config (super);
+    sftpfs_fill_connection_data_from_config (super, &error);
 
     ret_value = sftpfs_open_connection (super, &error);
     sftpfs_show_error (&error);
