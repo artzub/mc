@@ -135,18 +135,22 @@ sftpfs_lstat (const vfs_path_t * vpath, struct stat *buf, GError ** error)
     if (super_data->sftp_session == NULL)
         return -1;
 
-
-
-    while ((res =
-            libssh2_sftp_stat_ex (super_data->sftp_session,
-                                  sftpfs_fix_filename (path_element->path),
-                                  sftpfs_filename_buffer->len, LIBSSH2_SFTP_LSTAT,
-                                  &attrs)) == LIBSSH2_ERROR_EAGAIN)
+    do
     {
-        sftpfs_waitsocket (super_data, error);
-        if (error != NULL && *error != NULL)
-            return -1;
+        const char *fixfname;
+        fixfname = sftpfs_fix_filename (path_element->path);
+
+        res = libssh2_sftp_stat_ex (super_data->sftp_session, fixfname,
+                                    sftpfs_filename_buffer->len, LIBSSH2_SFTP_LSTAT, &attrs);
+
+        if (res < 0)
+        {
+            if (libssh2_session_last_errno (super_data->session) != LIBSSH2_ERROR_EAGAIN)
+                return -1;
+            sftpfs_waitsocket (super_data, error);
+        }
     }
+    while (res < 0);
 
     if (res < 0)
     {
